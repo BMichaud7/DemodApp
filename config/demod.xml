@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<demod_config>
+
+  <broker>
+    <url>amqp://localhost:5672</url>
+    <username>sdr_ctrl</username>
+    <password>sdr_hw_test</password>
+    <!-- Subscribe: classification results from AnalysisApp -->
+    <analysis_topic>rf.analysis</analysis_topic>
+    <!-- Publish IQ task requests to SdrResourceManager -->
+    <task_request_queue>sdr.tasks</task_request_queue>
+    <!-- Publish demodulated output (audio/bits/raw) -->
+    <demod_topic>rf.demod</demod_topic>
+  </broker>
+
+  <!-- IP of this host — used for SdrResourceManager to stream IQ back -->
+  <streaming>
+    <local_ip>127.0.0.1</local_ip>
+  </streaming>
+
+  <output>
+    <!-- Directory for WAV files (audio) and .bits files (digital) -->
+    <output_dir>/tmp/sdr-demod</output_dir>
+    <!-- Also publish results to rf.demod AMQP topic -->
+    <publish_amqp>true</publish_amqp>
+  </output>
+
+  <engine>
+    <!-- Task rank: higher = lower priority vs scanner (1) and analysis (2) -->
+    <rank>3</rank>
+    <!-- Minimum ONNX confidence to trigger demodulation [0.0–1.0] -->
+    <min_confidence>0.70</min_confidence>
+    <!-- Minimum interval (ms) before re-demodulating the same frequency -->
+    <cooldown_ms>30000</cooldown_ms>
+    <!-- IQ collection window for analog (audio) signals -->
+    <audio_duration_ms>5000</audio_duration_ms>
+    <!-- IQ collection window for digital signals -->
+    <digital_duration_ms>2000</digital_duration_ms>
+    <!-- Output sample rate for WAV files -->
+    <audio_sample_rate_hz>48000</audio_sample_rate_hz>
+  </engine>
+
+</demod_config>
