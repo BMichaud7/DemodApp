@@ -171,4 +171,44 @@ makeCw(double sr, int dit_samples)
     return iq;
 }
 
+/**
+ * @brief Generate a Bell 202 AFSK IQ signal for a given bit sequence.
+ *
+ * FM-modulates alternating mark (1200 Hz) or space (2200 Hz) audio tones onto
+ * a baseband carrier, matching the kf used by AfskDemod (deviation = 1200 Hz).
+ * Phase is continuous across symbol boundaries.
+ *
+ * @param sr   Sample rate in Hz (typically 9600).
+ * @param bits Bit sequence: 1 = mark (1200 Hz), 0 = space (2200 Hz).
+ * @return IQ samples of the FM-modulated AFSK signal.
+ */
+static inline std::vector<std::complex<float>>
+makeAfsk(double sr, const std::vector<int>& bits)
+{
+    constexpr double k_mark  = 1200.0;
+    constexpr double k_space = 2200.0;
+    constexpr double k_baud  = 1200.0;
+    const int sps = std::max(1, static_cast<int>(std::round(sr / k_baud)));
+    const double kf = 1200.0 / sr; // matches AfskDemod's kf
+
+    const size_t N = bits.size() * static_cast<size_t>(sps);
+    std::vector<std::complex<float>> iq(N);
+
+    double fm_phase    = 0.0;
+    double audio_phase = 0.0;
+    size_t idx = 0;
+    for (int bit : bits) {
+        double tone_hz = (bit != 0) ? k_mark : k_space;
+        for (int i = 0; i < sps; ++i) {
+            double audio  = std::sin(audio_phase);
+            audio_phase  += 2.0 * M_PI * tone_hz / sr;
+            fm_phase     += 2.0 * M_PI * kf * audio;
+            iq[idx++] = std::complex<float>(
+                static_cast<float>(std::cos(fm_phase)),
+                static_cast<float>(std::sin(fm_phase)));
+        }
+    }
+    return iq;
+}
+
 } // namespace TestSignals

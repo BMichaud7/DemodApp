@@ -157,6 +157,7 @@ add_executable(demod_tests
     tests/test_fsk_demod.cpp
     tests/test_psk_qam_demod.cpp
     tests/test_cw_demod.cpp
+    tests/test_afsk_demod.cpp
     tests/test_config.cpp
 )
 target_include_directories(demod_tests PRIVATE tests)
