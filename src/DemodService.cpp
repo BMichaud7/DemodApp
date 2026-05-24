@@ -86,7 +86,7 @@ public:
     }
 
     void on_connection_open(proton::connection& c) override {
-        c.open_receiver(cfg_.analysis_topic);
+        c.open_receiver(cfg_.demod_request_queue);
         sender_ = c.open_sender(cfg_.demod_topic);
     }
 
@@ -103,23 +103,19 @@ public:
         try {
             std::string body = proton::get<std::string>(m.body());
             auto j = json::parse(body);
-            if (j.value("msg_type","") != "ANALYSIS_RESULT") return;
+            if (j.value("msg_type","") != "DEMOD_REQUEST") return;
 
             PendingDemod p;
-            auto& mod = j["modulation"];
-            if (mod.contains("digital") && !mod["digital"].get<std::string>().empty())
-                p.modulation = mod["digital"];
-            else if (mod.contains("analog"))
-                p.modulation = mod["analog"];
-            if (p.modulation.empty()) return;
-
+            p.modulation      = j.value("modulation", std::string(""));
             p.center_freq_hz  = j.value("center_freq_hz", 0.0);
             p.bandwidth_hz    = j.value("bandwidth_hz", 0.0);
-            p.symbol_rate_sps = mod.value("symbol_rate_sps", 0.0);
-            p.confidence      = (float)j["classification_path"].value("onnx_confidence", 0.0);
+            p.symbol_rate_sps = j.value("symbol_rate_sps", 0.0);
+            p.confidence      = (float)j.value("confidence", 0.0);
             p.timestamp_ms    = j.value("timestamp_ms", (int64_t)0);
 
-            if (p.center_freq_hz > 0 && on_result_)
+            if (p.modulation.empty() || p.center_freq_hz <= 0) return;
+
+            if (on_result_)
                 on_result_(p);
         } catch (const std::exception& ex) {
             spdlog::debug("DemodService: parse error: {}", ex.what());
@@ -179,8 +175,8 @@ void DemodService::start() {
     ::mkdir(cfg_.output.output_dir.c_str(), 0755);
     worker_thread_ = std::thread(&DemodService::workerLoop, this);
     sub_thread_    = std::thread(&DemodService::subscriptionLoop, this);
-    spdlog::info("DemodService: started (sub={} pub={})",
-                 cfg_.broker.analysis_topic, cfg_.broker.demod_topic);
+    spdlog::info("DemodService: started (req={} pub={})",
+                 cfg_.broker.demod_request_queue, cfg_.broker.demod_topic);
 }
 
 void DemodService::stop() {
@@ -193,7 +189,7 @@ void DemodService::stop() {
 
 void DemodService::subscriptionLoop() {
     while (running_.load()) {
-        auto on_det = [this](const PendingDemod& p){ onAnalysisResult(p); };
+        auto on_det = [this](const PendingDemod& p){ onDemodRequest(p); };
         amqp_handler_ = std::make_shared<ServiceAmqpHandler>(cfg_.broker, on_det);
         auto container = std::make_shared<proton::container>(*amqp_handler_);
         try {
@@ -207,28 +203,12 @@ void DemodService::subscriptionLoop() {
     }
 }
 
-void DemodService::onAnalysisResult(const PendingDemod& p) {
-    // Filter by confidence
-    if (p.confidence < cfg_.engine.min_confidence) {
-        spdlog::debug("DemodService: {:.3f} MHz {} confidence {:.0f}% < {:.0f}% — skip",
-                      p.center_freq_hz / 1e6, p.modulation,
-                      p.confidence * 100.f, cfg_.engine.min_confidence * 100.f);
-        return;
-    }
-
-    // Frequency dedup / cooldown
-    int64_t bucket = static_cast<int64_t>(p.center_freq_hz / 100'000.0);
-    auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
+void DemodService::onDemodRequest(const PendingDemod& p) {
+    spdlog::info("DemodService: DEMOD_REQUEST {:.3f} MHz mod={}",
+                 p.center_freq_hz / 1e6, p.modulation);
     {
         std::lock_guard lk(q_mu_);
-        auto it = recent_demod_.find(bucket);
-        if (it != recent_demod_.end() &&
-            (now_ms - it->second) < cfg_.engine.cooldown_ms) return;
-        recent_demod_[bucket] = now_ms;
-        constexpr size_t MAX_QUEUE = 8;
-        if (queue_.size() < MAX_QUEUE)
-            queue_.push(p);
+        queue_.push(p);
     }
     q_cv_.notify_one();
 }

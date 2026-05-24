@@ -5,8 +5,8 @@
     <url>amqp://localhost:5672</url>
     <username>sdr_ctrl</username>
     <password>sdr_hw_test</password>
-    <!-- Subscribe: classification results from AnalysisApp -->
-    <analysis_topic>rf.analysis</analysis_topic>
+    <!-- Subscribe: explicit demodulation requests from AnalysisApp or a user app -->
+    <demod_request_queue>rf.demod.request</demod_request_queue>
     <!-- Publish IQ task requests to SdrResourceManager -->
     <task_request_queue>sdr.tasks</task_request_queue>
     <!-- Publish demodulated output (audio/bits/raw) -->
@@ -28,10 +28,6 @@
   <engine>
     <!-- Task rank: higher = lower priority vs scanner (1) and analysis (2) -->
     <rank>3</rank>
-    <!-- Minimum ONNX confidence to trigger demodulation [0.0–1.0] -->
-    <min_confidence>0.70</min_confidence>
-    <!-- Minimum interval (ms) before re-demodulating the same frequency -->
-    <cooldown_ms>30000</cooldown_ms>
     <!-- IQ collection window for analog (audio) signals -->
     <audio_duration_ms>5000</audio_duration_ms>
     <!-- IQ collection window for digital signals -->

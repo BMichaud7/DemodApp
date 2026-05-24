@@ -12,12 +12,12 @@ namespace demod {
  * @brief AMQP broker connection parameters.
  */
 struct BrokerConfig {
-    std::string url             = "amqp://localhost:5672"; ///< Broker URL.
-    std::string username;                                  ///< Optional username.
-    std::string password;                                  ///< Optional password.
-    std::string analysis_topic  = "rf.analysis";          ///< Topic for analysis results.
-    std::string task_queue      = "sdr.tasks";             ///< Queue for IQ task requests.
-    std::string demod_topic     = "rf.demod";              ///< Topic for demod output.
+    std::string url                  = "amqp://localhost:5672"; ///< Broker URL.
+    std::string username;                                       ///< Optional username.
+    std::string password;                                       ///< Optional password.
+    std::string demod_request_queue  = "rf.demod.request";     ///< Queue for inbound DEMOD_REQUEST messages.
+    std::string task_queue           = "sdr.tasks";             ///< Queue for IQ task requests.
+    std::string demod_topic          = "rf.demod";              ///< Topic for demod output.
 };
 
 /**
@@ -33,8 +33,6 @@ struct OutputConfig {
  */
 struct EngineConfig {
     int     rank                = 3;         ///< IQ fetch priority rank.
-    float   min_confidence      = 0.70f;     ///< Minimum classifier confidence to demod.
-    int64_t cooldown_ms         = 30'000;    ///< Minimum interval between re-demods (ms).
     int64_t audio_duration_ms   = 5'000;     ///< IQ capture duration for audio modes (ms).
     int64_t digital_duration_ms = 2'000;     ///< IQ capture duration for digital modes (ms).
     int     audio_sample_rate   = 48'000;    ///< Target output PCM sample rate in Hz.

@@ -45,7 +45,7 @@ AppConfig AppConfig::fromXml(const std::string& path) {
         cfg.broker.url            = optText(b, "url", "amqp://localhost:5672");
         cfg.broker.username       = optText(b, "username");
         cfg.broker.password       = optText(b, "password");
-        cfg.broker.analysis_topic = optText(b, "analysis_topic", "rf.analysis");
+        cfg.broker.demod_request_queue = optText(b, "demod_request_queue", "rf.demod.request");
         cfg.broker.task_queue     = optText(b, "task_request_queue", "sdr.tasks");
         cfg.broker.demod_topic    = optText(b, "demod_topic", "rf.demod");
     }
@@ -60,8 +60,6 @@ AppConfig AppConfig::fromXml(const std::string& path) {
 
     if (auto* e = root->FirstChildElement("engine")) {
         cfg.engine.rank                = (int)optD(e, "rank", 3);
-        cfg.engine.min_confidence      = (float)optD(e, "min_confidence", 0.70);
-        cfg.engine.cooldown_ms         = optI64(e, "cooldown_ms", 30000);
         cfg.engine.audio_duration_ms   = optI64(e, "audio_duration_ms", 5000);
         cfg.engine.digital_duration_ms = optI64(e, "digital_duration_ms", 2000);
         cfg.engine.audio_sample_rate   = (int)optD(e, "audio_sample_rate_hz", 48000);

@@ -81,10 +81,10 @@ private:
     void publishResult(const DemodResult& r);
 
     /**
-     * @brief Called from the subscription thread when a new analysis result arrives.
-     * @param p Pending demodulation task parsed from the AMQP message.
+     * @brief Called from the subscription thread when a DEMOD_REQUEST message arrives.
+     * @param p Demodulation task parsed from the DEMOD_REQUEST message.
      */
-    void onAnalysisResult(const PendingDemod& p);
+    void onDemodRequest(const PendingDemod& p);
 
     AppConfig   cfg_;       ///< Application configuration.
     IqFetcher   fetcher_;   ///< IQ sample fetcher.
@@ -98,8 +98,6 @@ private:
     std::condition_variable  q_cv_; ///< Signals worker when tasks arrive.
     std::queue<PendingDemod> queue_; ///< Pending demodulation tasks.
 
-    /// @brief Frequency deduplication map: freq_bucket → last_demod_ms.
-    std::unordered_map<int64_t, int64_t> recent_demod_;
 
     std::shared_ptr<ServiceAmqpHandler> amqp_handler_; ///< AMQP session handler.
 };

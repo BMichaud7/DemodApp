@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
         spdlog::set_level(spdlog::level::from_str(v));
     }
 
-    spdlog::info("sdr-demod starting (sub={} out={})",
-                 cfg.broker.analysis_topic, cfg.output.output_dir);
+    spdlog::info("sdr-demod starting (req={} out={})",
+                 cfg.broker.demod_request_queue, cfg.output.output_dir);
 
     std::signal(SIGINT,  sigHandler);
     std::signal(SIGTERM, sigHandler);
