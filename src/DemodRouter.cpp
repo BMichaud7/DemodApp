@@ -3,6 +3,8 @@
 #include "demod/AmDemod.hpp"
 #include "demod/FskDemod.hpp"
 #include "demod/PskQamDemod.hpp"
+#include "demod/CwDemod.hpp"
+#include "demod/AfskDemod.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <chrono>
@@ -68,6 +70,14 @@ DemodParams DemodRouter::paramsFor(const std::string& mod,
         double sr = std::max(bw * 2, symbol_rate_sps > 0 ? symbol_rate_sps * 4 : 50'000.0);
         return {sr, bw, cfg_.engine.digital_duration_ms, DemodClass::Bits};
     }
+    if (mod == "CW") {
+        return {8'000, 500, cfg_.engine.digital_duration_ms,
+                DemodClass::Bits, 2};
+    }
+    if (mod == "AFSK") {
+        return {9'600, 3'000, cfg_.engine.digital_duration_ms,
+                DemodClass::Bits, 2};
+    }
     // OFDM / CSS / LFM → raw IQ dump
     return {std::max(bw * 2, 250'000.0), bw, cfg_.engine.digital_duration_ms,
             DemodClass::RawIq};
@@ -120,6 +130,12 @@ void DemodRouter::route(const std::string& modulation,
             result = d.process(iq, actual_sr, center_freq_hz, timestamp_ms);
         } else if (modulation == "8FSK") {
             FskDemod d(8);
+            result = d.process(iq, actual_sr, center_freq_hz, timestamp_ms);
+        } else if (modulation == "CW") {
+            CwDemod d;
+            result = d.process(iq, actual_sr, center_freq_hz, timestamp_ms);
+        } else if (modulation == "AFSK") {
+            AfskDemod d;
             result = d.process(iq, actual_sr, center_freq_hz, timestamp_ms);
         } else {
             PskQamDemod d(modulation, symbol_rate_sps);

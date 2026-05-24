@@ -39,6 +39,18 @@ DemodResult FmDemod::process(const std::vector<std::complex<float>>& iq,
         discrim.data());
     freqdem_destroy(demod);
 
+    // De-emphasis filter (FM WB only, τ = 75 µs — Americas standard)
+    if (deviation_hz_ >= 50000.0) {
+        constexpr double tau = 75e-6;
+        const double alpha_de = (1.0 / sr_sps) / (tau + 1.0 / sr_sps);
+        double y_prev = 0.0;
+        for (float& x : discrim) {
+            double y = alpha_de * x + (1.0 - alpha_de) * y_prev;
+            x = static_cast<float>(y);
+            y_prev = y;
+        }
+    }
+
     // Resample from sr_sps → out_sr_
     float rate = static_cast<float>(out_sr_) / static_cast<float>(sr_sps);
     msresamp_rrrf resamp = msresamp_rrrf_create(rate, 60.0f);

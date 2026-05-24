@@ -108,6 +108,8 @@ add_library(demod_lib STATIC
     src/demod/AmDemod.cpp
     src/demod/FskDemod.cpp
     src/demod/PskQamDemod.cpp
+    src/demod/CwDemod.cpp
+    src/demod/AfskDemod.cpp
 )
 target_include_directories(demod_lib PUBLIC include)
 target_link_libraries(demod_lib PUBLIC
@@ -139,6 +141,31 @@ include(GNUInstallDirs)
 install(TARGETS sdr_demod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES config/demod.xml
         DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/sdr-demod)
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+include(FetchContent)
+FetchContent_Declare(googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        v1.14.0)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+enable_testing()
+
+add_executable(demod_tests
+    tests/test_fm_demod.cpp
+    tests/test_am_demod.cpp
+    tests/test_fsk_demod.cpp
+    tests/test_psk_qam_demod.cpp
+    tests/test_cw_demod.cpp
+    tests/test_config.cpp
+)
+target_include_directories(demod_tests PRIVATE tests)
+target_link_libraries(demod_tests PRIVATE
+    demod_lib
+    GTest::gtest_main
+)
+include(GoogleTest)
+gtest_discover_tests(demod_tests)
 
 message(STATUS "┌─ DemodApp ${PROJECT_VERSION} ──────────────────────────────────┐")
 message(STATUS "│  C++ standard : C++20                                           │")
