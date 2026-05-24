@@ -36,6 +36,7 @@ struct DemodResult {
     int64_t     timestamp_ms;     ///< Capture start time (UNIX milliseconds).
     int64_t     duration_ms;      ///< Duration of the captured block.
     int         bits_per_symbol = 1; ///< Bits per symbol for digital modes.
+    std::string stream_id;          ///< Non-empty when produced by a streaming session.
 
     // Exactly one of these is populated:
     std::vector<float>               audio;  ///< PCM float32, typically 48 kHz mono.

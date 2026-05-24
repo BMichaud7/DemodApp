@@ -13,6 +13,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace demod {
 
@@ -85,6 +86,47 @@ private:
      * @param p Demodulation task parsed from the DEMOD_REQUEST message.
      */
     void onDemodRequest(const PendingDemod& p);
+
+    // ── Streaming ─────────────────────────────────────────────────────────────
+
+    /**
+     * @brief Holds state for one active streaming session.
+     *
+     * The stream thread reads @p active to decide whether to continue looping.
+     * Setting @p active to false from any thread causes the loop to exit after
+     * the current IQ fetch completes.
+     */
+    struct StreamSession {
+        PendingDemod      params;
+        std::atomic<bool> active{true};
+    };
+    using StreamPtr = std::shared_ptr<StreamSession>;
+
+    /**
+     * @brief Start continuous demodulation for @p stream_id.
+     *
+     * Creates a StreamSession and spawns a dedicated thread.  If a session with
+     * the same @p stream_id already exists the call is silently ignored.
+     */
+    void startStream(const std::string& stream_id, const PendingDemod& p);
+
+    /**
+     * @brief Signal stream @p stream_id to stop after its current IQ fetch.
+     *
+     * Non-blocking — sets the active flag and removes the session from the map.
+     * The underlying thread joins at the next stop() or service destruction.
+     */
+    void stopStream(const std::string& stream_id);
+
+    /// @brief Body of each stream worker thread.
+    void streamLoop(StreamPtr session, std::string stream_id);
+
+    std::mutex streams_mu_;
+    /// Active sessions keyed by stream_id.
+    std::unordered_map<std::string, StreamPtr> streams_;
+    /// All stream threads — joined in stop().
+    std::mutex thread_mu_;
+    std::vector<std::thread> stream_threads_;
 
     AppConfig   cfg_;       ///< Application configuration.
     IqFetcher   fetcher_;   ///< IQ sample fetcher.

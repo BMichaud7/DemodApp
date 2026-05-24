@@ -50,14 +50,19 @@ public:
      * @param confidence     Classifier confidence (informational).
      * @param timestamp_ms   Analysis timestamp in milliseconds.
      * @param request_id     Correlation ID for the IQ fetch request.
+     * @param stream_id      Non-empty when called from a streaming session;
+     *                       propagated into the DemodResult for subscriber filtering.
+     * @return true  if IQ was successfully fetched and a result was produced.
+     * @return false if IQ fetch returned empty (signal gone or SDR busy).
      */
-    void route(const std::string& modulation,
+    bool route(const std::string& modulation,
                double center_freq_hz,
                double bandwidth_hz,
                double symbol_rate_sps,
                float  confidence,
                int64_t timestamp_ms,
-               const std::string& request_id);
+               const std::string& request_id,
+               const std::string& stream_id = "");
 
 private:
     AppConfig      cfg_;       ///< Application configuration.

@@ -65,8 +65,14 @@ static void writeWav(const std::string& path, const std::vector<float>& pcm,
 class ServiceAmqpHandler : public proton::messaging_handler {
 public:
     ServiceAmqpHandler(const BrokerConfig& cfg,
-                       std::function<void(const PendingDemod&)> on_result)
-        : cfg_(cfg), on_result_(std::move(on_result)) {}
+                       std::function<void(const PendingDemod&)> on_result,
+                       std::function<void(const std::string&, const PendingDemod&)> on_start_stream,
+                       std::function<void(const std::string&)> on_stop)
+        : cfg_(cfg)
+        , on_result_(std::move(on_result))
+        , on_start_stream_(std::move(on_start_stream))
+        , on_stop_(std::move(on_stop))
+    {}
 
     void on_container_start(proton::container& c) override {
         proton::connection_options opts;
@@ -103,7 +109,16 @@ public:
         try {
             std::string body = proton::get<std::string>(m.body());
             auto j = json::parse(body);
-            if (j.value("msg_type","") != "DEMOD_REQUEST") return;
+            std::string msg_type = j.value("msg_type", "");
+
+            if (msg_type == "STOP_DEMOD_STREAM") {
+                std::string sid = j.value("stream_id", std::string(""));
+                if (!sid.empty() && on_stop_) on_stop_(sid);
+                return;
+            }
+
+            // DEMOD_REQUEST and START_DEMOD_STREAM share the same signal fields
+            if (msg_type != "DEMOD_REQUEST" && msg_type != "START_DEMOD_STREAM") return;
 
             PendingDemod p;
             p.modulation      = j.value("modulation", std::string(""));
@@ -115,8 +130,12 @@ public:
 
             if (p.modulation.empty() || p.center_freq_hz <= 0) return;
 
-            if (on_result_)
-                on_result_(p);
+            if (msg_type == "START_DEMOD_STREAM") {
+                std::string sid = j.value("stream_id", std::string(""));
+                if (!sid.empty() && on_start_stream_) on_start_stream_(sid, p);
+            } else {
+                if (on_result_) on_result_(p);
+            }
         } catch (const std::exception& ex) {
             spdlog::debug("DemodService: parse error: {}", ex.what());
         }
@@ -152,7 +171,9 @@ public:
 
 private:
     BrokerConfig cfg_;
-    std::function<void(const PendingDemod&)> on_result_;
+    std::function<void(const PendingDemod&)>              on_result_;
+    std::function<void(const std::string&, const PendingDemod&)> on_start_stream_;
+    std::function<void(const std::string&)>               on_stop_;
     proton::sender sender_;
     proton::work_queue* wq_{nullptr};
     std::mutex mu_;
@@ -181,16 +202,35 @@ void DemodService::start() {
 
 void DemodService::stop() {
     if (!running_.exchange(false)) return;
+
+    // Signal all stream loops to exit.
+    {
+        std::lock_guard lk(streams_mu_);
+        for (auto& [id, s] : streams_)
+            s->active.store(false);
+        streams_.clear();
+    }
+
     q_cv_.notify_all();
     if (amqp_handler_) amqp_handler_->close();
     if (sub_thread_.joinable())    sub_thread_.join();
     if (worker_thread_.joinable()) worker_thread_.join();
+
+    // Join stream threads (each may still be mid-fetch — wait for them).
+    {
+        std::lock_guard lk(thread_mu_);
+        for (auto& t : stream_threads_)
+            if (t.joinable()) t.join();
+        stream_threads_.clear();
+    }
 }
 
 void DemodService::subscriptionLoop() {
     while (running_.load()) {
-        auto on_det = [this](const PendingDemod& p){ onDemodRequest(p); };
-        amqp_handler_ = std::make_shared<ServiceAmqpHandler>(cfg_.broker, on_det);
+        auto on_det   = [this](const PendingDemod& p){ onDemodRequest(p); };
+        auto on_start = [this](const std::string& sid, const PendingDemod& p){ startStream(sid, p); };
+        auto on_stop  = [this](const std::string& sid){ stopStream(sid); };
+        amqp_handler_ = std::make_shared<ServiceAmqpHandler>(cfg_.broker, on_det, on_start, on_stop);
         auto container = std::make_shared<proton::container>(*amqp_handler_);
         try {
             container->run();
@@ -238,13 +278,85 @@ void DemodService::workerLoop() {
     }
 }
 
+// ── Streaming ─────────────────────────────────────────────────────────────────
+
+void DemodService::startStream(const std::string& stream_id, const PendingDemod& p)
+{
+    {
+        std::lock_guard lk(streams_mu_);
+        if (streams_.count(stream_id)) {
+            spdlog::warn("DemodService: stream {} already active, ignoring START", stream_id);
+            return;
+        }
+        streams_[stream_id] = std::make_shared<StreamSession>(StreamSession{p});
+    }
+    spdlog::info("DemodService: starting stream {} for {:.3f} MHz {}",
+                 stream_id, p.center_freq_hz / 1e6, p.modulation);
+    std::lock_guard lk(thread_mu_);
+    stream_threads_.emplace_back([this, stream_id]() {
+        StreamPtr session;
+        {
+            std::lock_guard slk(streams_mu_);
+            auto it = streams_.find(stream_id);
+            if (it == streams_.end()) return;
+            session = it->second;
+        }
+        streamLoop(session, stream_id);
+    });
+}
+
+void DemodService::stopStream(const std::string& stream_id)
+{
+    std::lock_guard lk(streams_mu_);
+    auto it = streams_.find(stream_id);
+    if (it == streams_.end()) {
+        spdlog::warn("DemodService: STOP_DEMOD_STREAM for unknown stream {}", stream_id);
+        return;
+    }
+    it->second->active.store(false);
+    streams_.erase(it);
+    spdlog::info("DemodService: stream {} stop requested", stream_id);
+}
+
+void DemodService::streamLoop(StreamPtr session, std::string stream_id)
+{
+    constexpr int MAX_CONSECUTIVE_FAILURES = 3;
+    int failures = 0;
+    uint64_t chunk = 0;
+
+    while (session->active.load() && running_.load()) {
+        std::string req_id = stream_id + "-" + std::to_string(chunk++);
+        auto& p = session->params;
+        bool ok = router_.route(p.modulation, p.center_freq_hz, p.bandwidth_hz,
+                                p.symbol_rate_sps, p.confidence,
+                                p.timestamp_ms, req_id, stream_id);
+        if (!ok) {
+            if (++failures >= MAX_CONSECUTIVE_FAILURES) {
+                spdlog::warn("DemodService: stream {} stopping — {} consecutive IQ failures",
+                             stream_id, failures);
+                break;
+            }
+        } else {
+            failures = 0;
+        }
+    }
+
+    spdlog::info("DemodService: stream {} ended (chunk={})", stream_id, chunk);
+    // Remove session entry if it hasn't been removed already (e.g. natural stop).
+    std::lock_guard lk(streams_mu_);
+    streams_.erase(stream_id);
+}
+
 void DemodService::publishResult(const DemodResult& r) {
     // ── Write file ───────────────────────────────────────────────────────────
     auto ts = std::to_string(r.timestamp_ms);
     std::ostringstream fn;
     fn << cfg_.output.output_dir << "/"
        << std::fixed << std::setprecision(3) << (r.center_freq_hz / 1e6)
-       << "MHz_" << r.modulation << "_" << ts;
+       << "MHz_" << r.modulation;
+    if (!r.stream_id.empty())
+        fn << "_stream-" << r.stream_id.substr(0, 8);
+    fn << "_" << ts;
 
     if (r.type == DemodClass::Audio && !r.audio.empty()) {
         std::string wav_path = fn.str() + ".wav";
@@ -283,6 +395,8 @@ void DemodService::publishResult(const DemodResult& r) {
     j["modulation"]      = r.modulation;
     j["timestamp_ms"]    = r.timestamp_ms;
     j["duration_ms"]     = r.duration_ms;
+    if (!r.stream_id.empty())
+        j["stream_id"]   = r.stream_id;
 
     if (r.type == DemodClass::Audio) {
         j["demod_class"]     = "audio";

@@ -83,13 +83,14 @@ DemodParams DemodRouter::paramsFor(const std::string& mod,
             DemodClass::RawIq};
 }
 
-void DemodRouter::route(const std::string& modulation,
+bool DemodRouter::route(const std::string& modulation,
                         double center_freq_hz,
                         double bandwidth_hz,
                         double symbol_rate_sps,
                         float  /*confidence*/,
                         int64_t timestamp_ms,
-                        const std::string& request_id)
+                        const std::string& request_id,
+                        const std::string& stream_id)
 {
     DemodParams p = paramsFor(modulation, bandwidth_hz, symbol_rate_sps);
 
@@ -101,7 +102,7 @@ void DemodRouter::route(const std::string& modulation,
                                p.sample_rate_sps, p.duration_ms, request_id);
     if (iq.empty()) {
         spdlog::warn("DemodRouter: no IQ for {:.3f} MHz", center_freq_hz / 1e6);
-        return;
+        return false;
     }
 
     double actual_sr = fetcher_.lastSampleRate();
@@ -152,7 +153,9 @@ void DemodRouter::route(const std::string& modulation,
         result.raw_iq         = std::move(iq);
     }
 
+    result.stream_id = stream_id;
     on_result_(result);
+    return true;
 }
 
 } // namespace demod
