@@ -26,8 +26,8 @@
   </output>
 
   <engine>
-    <!-- Task rank: higher = lower priority vs scanner (1) and analysis (2) -->
-    <rank>3</rank>
+    <!-- Task rank: higher = higher priority; scanner=1, analysis=2, demod=4 -->
+    <rank>4</rank>
     <!-- IQ collection window for analog (audio) signals -->
     <audio_duration_ms>5000</audio_duration_ms>
     <!-- IQ collection window for digital signals -->
