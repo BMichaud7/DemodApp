@@ -20,6 +20,7 @@ WORKDIR /build/DemodApp
 RUN cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/install \
+        -DBUILD_TESTING=OFF \
     && cmake --build build --parallel "$(nproc)" \
     && cmake --install build
 

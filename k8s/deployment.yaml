@@ -1,0 +1,220 @@
+# ════════════════════════════════════════════════════════════════════════
+#  DemodApp Streaming Demodulator — Kubernetes / k3s Manifests
+#
+#  Apply:
+#    kubectl apply -f k8s/deployment.yaml
+#
+#  Update config only:
+#    kubectl create configmap demod-config -n sdr-system \
+#      --from-file=demod.xml=config/demod.xml \
+#      --dry-run=client -o yaml | kubectl apply -f -
+#    kubectl rollout restart deployment/sdr-demod -n sdr-system
+# ════════════════════════════════════════════════════════════════════════
+
+---
+# ── Namespace (shared with rest of sdr-system) ─────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sdr-system
+  labels:
+    app.kubernetes.io/name: sdr-system
+
+---
+# ── ConfigMap: demod.xml ───────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demod-config
+  namespace: sdr-system
+  labels:
+    app: sdr-demod
+data:
+  demod.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <demod_config>
+      <broker>
+        <url>amqp://activemq-service.sdr-system.svc.cluster.local:5672</url>
+        <username>sdr_ctrl</username>
+        <password>${AMQP_PASSWORD}</password>
+        <demod_request_queue>rf.demod.request</demod_request_queue>
+        <task_request_queue>sdr.task.request</task_request_queue>
+        <demod_topic>rf.demod</demod_topic>
+      </broker>
+
+      <streaming>
+        <local_ip>${POD_IP}</local_ip>
+      </streaming>
+
+      <output>
+        <output_dir>/demod-output</output_dir>
+        <publish_amqp>true</publish_amqp>
+      </output>
+
+      <engine>
+        <rank>4</rank>
+        <audio_duration_ms>5000</audio_duration_ms>
+        <digital_duration_ms>2000</digital_duration_ms>
+        <audio_sample_rate_hz>48000</audio_sample_rate_hz>
+      </engine>
+    </demod_config>
+
+---
+# ── Deployment ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sdr-demod
+  namespace: sdr-system
+  labels:
+    app: sdr-demod
+    version: "1.0.0"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: sdr-demod
+  template:
+    metadata:
+      labels:
+        app: sdr-demod
+        version: "1.0.0"
+    spec:
+      terminationGracePeriodSeconds: 15
+
+      initContainers:
+        - name: render-config
+          image: python:3.12-alpine
+          command:
+            - python3
+            - -c
+            - |
+              import os, string
+              tmpl = open('/tmpl/demod.xml').read()
+              out  = string.Template(tmpl).safe_substitute(os.environ)
+              open('/out/demod.xml', 'w').write(out)
+          env:
+            - name: AMQP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sdr-credentials
+                  key: amqp-password
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: config-template
+              mountPath: /tmpl
+              readOnly: true
+            - name: config-rendered
+              mountPath: /out
+
+      containers:
+        - name: sdr-demod
+          image: ghcr.io/bmichaud7/sdr-demod:1.0.0
+          imagePullPolicy: Always
+
+          env:
+            - name: SDR_LOG_LEVEL
+              value: info
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+          volumeMounts:
+            - name: config-rendered
+              mountPath: /etc/sdr-demod
+              readOnly: true
+            - name: demod-output
+              mountPath: /demod-output
+
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "256Mi"
+            limits:
+              cpu: "2"
+              memory: "1Gi"
+
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "kill -0 1"]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "kill -0 1"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_RAW"]
+
+      volumes:
+        - name: config-template
+          configMap:
+            name: demod-config
+        - name: config-rendered
+          emptyDir: {}
+        - name: demod-output
+          emptyDir: {}
+
+---
+# ── NetworkPolicy ─────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sdr-demod-netpol
+  namespace: sdr-system
+spec:
+  podSelector:
+    matchLabels:
+      app: sdr-demod
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Accept UDP IQ streams from sdr-controller
+    - from:
+        - podSelector:
+            matchLabels:
+              app: sdr-controller
+      ports:
+        - protocol: UDP
+  egress:
+    # AMQP to broker
+    - to:
+        - podSelector:
+            matchLabels:
+              app: activemq
+      ports:
+        - port: 5672
+          protocol: TCP
+    # Task requests to sdr-controller
+    - to:
+        - podSelector:
+            matchLabels:
+              app: sdr-controller
+      ports:
+        - port: 5672
+          protocol: TCP
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
