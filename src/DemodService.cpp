@@ -288,7 +288,9 @@ void DemodService::startStream(const std::string& stream_id, const PendingDemod&
             spdlog::warn("DemodService: stream {} already active, ignoring START", stream_id);
             return;
         }
-        streams_[stream_id] = std::make_shared<StreamSession>(StreamSession{p});
+        auto sp = std::make_shared<StreamSession>();
+        sp->params = p;
+        streams_[stream_id] = std::move(sp);
     }
     spdlog::info("DemodService: starting stream {} for {:.3f} MHz {}",
                  stream_id, p.center_freq_hz / 1e6, p.modulation);
