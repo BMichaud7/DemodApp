@@ -25,11 +25,12 @@ public:
     /**
      * @brief Construct an FmDemod.
      *
-     * @param deviation_hz      Peak FM carrier deviation in Hz.
-     *                          Use 75000 for Wide-band FM, 2500–5000 for NBFM.
-     * @param output_sample_rate Desired output PCM sample rate in Hz (default 48000).
+     * @param deviation    Peak FM carrier deviation.
+     *                     Use hertz(75000) for Wide-band FM, hertz(2500–5000) for NBFM.
+     * @param output_rate  Desired output PCM sample rate (default 48 kHz).
      */
-    explicit FmDemod(double deviation_hz, int output_sample_rate = 48000);
+    explicit FmDemod(au::QuantityD<au::Hertz> deviation,
+                     au::QuantityD<au::Hertz> output_rate = au::hertz(48000.0));
 
     /// @brief Destructor.
     ~FmDemod() override;
@@ -37,20 +38,21 @@ public:
     /**
      * @brief FM-demodulate an IQ block to PCM audio.
      *
-     * @param iq             Baseband IQ samples centred at the signal carrier.
-     * @param sr_sps         IQ sample rate in samples/second.
-     * @param center_freq_hz Centre frequency of the capture in Hz.
-     * @param timestamp_ms   Capture start timestamp in milliseconds.
-     * @return DemodResult   with type == DemodClass::Audio and audio samples
-     *                       at @p output_sample_rate.
+     * @param iq          Baseband IQ samples centred at the signal carrier.
+     * @param sr          IQ sample rate.
+     * @param center_freq Centre frequency of the capture.
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult with type == DemodClass::Audio and audio samples
+     *                     at @p output_rate.
      */
     DemodResult process(const std::vector<std::complex<float>>& iq,
-                        double sr_sps, double center_freq_hz,
-                        int64_t timestamp_ms) override;
+                        au::QuantityD<au::Hertz>   sr,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Seconds> timestamp) override;
 
 private:
-    double deviation_hz_; ///< Peak FM deviation in Hz.
-    int    out_sr_;       ///< Output PCM sample rate in Hz.
+    au::QuantityD<au::Hertz> deviation_; ///< Peak FM deviation.
+    au::QuantityD<au::Hertz> out_rate_;  ///< Output PCM sample rate.
 };
 
 } // namespace demod

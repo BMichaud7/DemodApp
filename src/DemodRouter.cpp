@@ -101,14 +101,14 @@ DemodParams DemodRouter::paramsFor(const std::string&       mod,
             DemodClass::RawIq, 2, au::hertz(0.0)};
 }
 
-bool DemodRouter::route(const std::string&       modulation,
-                        au::QuantityD<au::Hertz> center_freq,
-                        au::QuantityD<au::Hertz> bandwidth,
-                        au::QuantityD<au::Hertz> symbol_rate,
-                        float                    /*confidence*/,
-                        int64_t                  timestamp_ms,
-                        const std::string&       request_id,
-                        const std::string&       stream_id)
+bool DemodRouter::route(const std::string&         modulation,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Hertz>   bandwidth,
+                        au::QuantityD<au::Hertz>   symbol_rate,
+                        float                      /*confidence*/,
+                        au::QuantityD<au::Seconds> timestamp,
+                        const std::string&         request_id,
+                        const std::string&         stream_id)
 {
     DemodParams p = paramsFor(modulation, bandwidth, symbol_rate);
 
@@ -125,55 +125,52 @@ bool DemodRouter::route(const std::string&       modulation,
         return false;
     }
 
-    // Extract raw doubles for DSP calls
-    auto   actual_sr_q  = fetcher_.lastSampleRate();
-    double actual_sr    = actual_sr_q > au::hertz(0.0)
-                              ? actual_sr_q.in(au::hertz)
-                              : p.sample_rate.in(au::hertz);
-    double cf           = center_freq.in(au::hertz);
-    int    out_sr_int   = static_cast<int>(cfg_.engine.audio_sample_rate.in(au::hertz));
+    // Resolve actual sample rate as Au quantity
+    auto actual_sr_q = fetcher_.lastSampleRate();
+    auto actual_sr   = actual_sr_q > au::hertz(0.0) ? actual_sr_q : p.sample_rate;
+    auto out_rate    = cfg_.engine.audio_sample_rate;
 
     DemodResult result;
 
     if (p.out_class == DemodClass::Audio) {
         if (modulation == "FM_WB" || modulation == "FM_NB") {
-            FmDemod d(p.fm_deviation.in(au::hertz), out_sr_int);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            FmDemod d(p.fm_deviation, out_rate);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else {
-            AmDemod d(modulation, out_sr_int);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            AmDemod d(modulation, out_rate);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         }
     } else if (p.out_class == DemodClass::Bits) {
         if (modulation == "OOK") {
             FskDemod d(2, /*is_ook=*/true);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "FSK" || modulation == "GFSK" ||
                    modulation == "GMSK" || modulation == "MSK") {
             FskDemod d(2);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "4FSK") {
             FskDemod d(4);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "8FSK") {
             FskDemod d(8);
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "CW") {
             CwDemod d;
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "AFSK") {
             AfskDemod d;
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         } else {
             PskQamDemod d(modulation, symbol_rate.in(au::hertz));
-            result = d.process(iq, actual_sr, cf, timestamp_ms);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
         }
     } else {
         // Raw IQ dump
         result.type        = DemodClass::RawIq;
         result.modulation  = modulation;
         result.center_freq = center_freq;
-        result.sample_rate = au::hertz(actual_sr);
-        result.timestamp_ms = timestamp_ms;
+        result.sample_rate = actual_sr;
+        result.timestamp_ms = static_cast<int64_t>(timestamp.in(au::seconds) * 1000.0);
         result.duration    = p.duration;
         result.raw_iq      = std::move(iq);
     }

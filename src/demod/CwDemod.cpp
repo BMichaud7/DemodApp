@@ -51,16 +51,20 @@ CwDemod::CwDemod() = default;
 CwDemod::~CwDemod() = default;
 
 DemodResult CwDemod::process(const std::vector<std::complex<float>>& iq,
-                              double sr_sps,
-                              double center_freq_hz,
-                              int64_t timestamp_ms)
+                              au::QuantityD<au::Hertz>   sr,
+                              au::QuantityD<au::Hertz>   center_freq,
+                              au::QuantityD<au::Seconds> timestamp)
 {
+    // Extract raw values for DSP math
+    const double sr_sps         = sr.in(au::hertz);
+    const double center_freq_hz = center_freq.in(au::hertz);
+
     DemodResult r;
     r.type        = DemodClass::Bits;
     r.modulation  = "CW";
-    r.center_freq = au::hertz(center_freq_hz);
-    r.sample_rate = au::hertz(sr_sps);
-    r.timestamp_ms = timestamp_ms;
+    r.center_freq = center_freq;
+    r.sample_rate = sr;
+    r.timestamp_ms = static_cast<int64_t>(timestamp.in(au::seconds) * 1000.0);
     r.duration    = au::seconds(iq.size() / sr_sps);
 
     if (iq.empty()) return r;

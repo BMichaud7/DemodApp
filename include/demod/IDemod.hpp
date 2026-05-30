@@ -73,16 +73,16 @@ public:
     /**
      * @brief Demodulate a block of IQ samples.
      *
-     * @param iq             Baseband IQ samples.
-     * @param sr_sps         Sample rate of the IQ data in samples/second.
-     * @param center_freq_hz Centre frequency of the capture in Hz.
-     * @param timestamp_ms   Capture start timestamp in milliseconds.
-     * @return DemodResult   Populated with the appropriate output field.
+     * @param iq          Baseband IQ samples.
+     * @param sr          Sample rate of the IQ data.
+     * @param center_freq Centre frequency of the capture.
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult Populated with the appropriate output field.
      */
     virtual DemodResult process(const std::vector<std::complex<float>>& iq,
-                                double sr_sps,
-                                double center_freq_hz,
-                                int64_t timestamp_ms) = 0;
+                                au::QuantityD<au::Hertz>   sr,
+                                au::QuantityD<au::Hertz>   center_freq,
+                                au::QuantityD<au::Seconds> timestamp) = 0;
 };
 
 } // namespace demod

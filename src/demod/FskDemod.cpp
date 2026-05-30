@@ -13,14 +13,18 @@ FskDemod::FskDemod(unsigned int m_ary, bool is_ook)
 FskDemod::~FskDemod() = default;
 
 DemodResult FskDemod::process(const std::vector<std::complex<float>>& iq,
-                               double sr_sps,
-                               double center_freq_hz,
-                               int64_t timestamp_ms)
+                               au::QuantityD<au::Hertz>   sr,
+                               au::QuantityD<au::Hertz>   center_freq,
+                               au::QuantityD<au::Seconds> timestamp)
 {
+    // Extract raw values for DSP math
+    const double sr_sps         = sr.in(au::hertz);
+    const double center_freq_hz = center_freq.in(au::hertz);
+
     DemodResult r;
     r.type        = DemodClass::Bits;
-    r.center_freq = au::hertz(center_freq_hz);
-    r.timestamp_ms = timestamp_ms;
+    r.center_freq = center_freq;
+    r.timestamp_ms = static_cast<int64_t>(timestamp.in(au::seconds) * 1000.0);
     r.duration    = au::seconds(iq.size() / sr_sps);
 
     const int bps = static_cast<int>(std::log2(m_ary_));  // bits per symbol

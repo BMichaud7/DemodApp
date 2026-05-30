@@ -9,6 +9,7 @@
 #include <functional>
 #include <string>
 #include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -48,22 +49,22 @@ public:
      * @param center_freq Centre frequency.
      * @param bandwidth   Reported signal bandwidth (zero = use default).
      * @param symbol_rate Symbol rate hint (zero = unknown).
-     * @param confidence  Classifier confidence (informational).
-     * @param timestamp_ms Analysis timestamp in milliseconds.
-     * @param request_id  Correlation ID for the IQ fetch request.
-     * @param stream_id   Non-empty when called from a streaming session;
-     *                    propagated into the DemodResult for subscriber filtering.
+     * @param confidence Classifier confidence (informational).
+     * @param timestamp  Analysis timestamp.
+     * @param request_id Correlation ID for the IQ fetch request.
+     * @param stream_id  Non-empty when called from a streaming session;
+     *                   propagated into the DemodResult for subscriber filtering.
      * @return true  if IQ was successfully fetched and a result was produced.
      * @return false if IQ fetch returned empty (signal gone or SDR busy).
      */
-    bool route(const std::string&       modulation,
-               au::QuantityD<au::Hertz> center_freq,
-               au::QuantityD<au::Hertz> bandwidth,
-               au::QuantityD<au::Hertz> symbol_rate,
-               float                    confidence,
-               int64_t                  timestamp_ms,
-               const std::string&       request_id,
-               const std::string&       stream_id = "");
+    bool route(const std::string&         modulation,
+               au::QuantityD<au::Hertz>   center_freq,
+               au::QuantityD<au::Hertz>   bandwidth,
+               au::QuantityD<au::Hertz>   symbol_rate,
+               float                      confidence,
+               au::QuantityD<au::Seconds> timestamp,
+               const std::string&         request_id,
+               const std::string&         stream_id = "");
 
 private:
     AppConfig      cfg_;       ///< Application configuration.

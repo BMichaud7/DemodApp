@@ -8,26 +8,34 @@
 
 namespace demod {
 
-FmDemod::FmDemod(double deviation_hz, int output_sample_rate)
-    : deviation_hz_(deviation_hz), out_sr_(output_sample_rate) {}
+FmDemod::FmDemod(au::QuantityD<au::Hertz> deviation,
+                 au::QuantityD<au::Hertz> output_rate)
+    : deviation_(deviation), out_rate_(output_rate) {}
 
 FmDemod::~FmDemod() = default;
 
 DemodResult FmDemod::process(const std::vector<std::complex<float>>& iq,
-                              double sr_sps,
-                              double center_freq_hz,
-                              int64_t timestamp_ms)
+                              au::QuantityD<au::Hertz>   sr,
+                              au::QuantityD<au::Hertz>   center_freq,
+                              au::QuantityD<au::Seconds> timestamp)
 {
+    // Extract raw values for DSP math
+    const double sr_sps         = sr.in(au::hertz);
+    const double center_freq_hz = center_freq.in(au::hertz);
+    const double deviation_hz   = deviation_.in(au::hertz);
+    const double out_sr_hz      = out_rate_.in(au::hertz);
+    const int    out_sr_int     = static_cast<int>(out_sr_hz);
+
     DemodResult r;
     r.type        = DemodClass::Audio;
-    r.modulation  = deviation_hz_ >= 50000.0 ? "FM_WB" : "FM_NB";
-    r.center_freq = au::hertz(center_freq_hz);
-    r.sample_rate = au::hertz(static_cast<double>(out_sr_));
-    r.timestamp_ms = timestamp_ms;
+    r.modulation  = deviation_hz >= 50000.0 ? "FM_WB" : "FM_NB";
+    r.center_freq = center_freq;
+    r.sample_rate = out_rate_;
+    r.timestamp_ms = static_cast<int64_t>(timestamp.in(au::seconds) * 1000.0);
     r.duration    = au::seconds(iq.size() / sr_sps);
 
     // kf = deviation / sample_rate (modulation factor for liquid freqdem)
-    float kf = static_cast<float>(deviation_hz_ / sr_sps);
+    float kf = static_cast<float>(deviation_hz / sr_sps);
     kf = std::clamp(kf, 0.01f, 0.49f);
 
     freqdem demod = freqdem_create(kf);
@@ -42,7 +50,7 @@ DemodResult FmDemod::process(const std::vector<std::complex<float>>& iq,
     freqdem_destroy(demod);
 
     // De-emphasis filter (FM WB only, τ = 75 µs — Americas standard)
-    if (deviation_hz_ >= 50000.0) {
+    if (deviation_hz >= 50000.0) {
         constexpr double tau = 75e-6;
         const double alpha_de = (1.0 / sr_sps) / (tau + 1.0 / sr_sps);
         double y_prev = 0.0;
@@ -53,8 +61,8 @@ DemodResult FmDemod::process(const std::vector<std::complex<float>>& iq,
         }
     }
 
-    // Resample from sr_sps → out_sr_
-    float rate = static_cast<float>(out_sr_) / static_cast<float>(sr_sps);
+    // Resample from sr_sps → out_sr_int
+    float rate = static_cast<float>(out_sr_int) / static_cast<float>(sr_sps);
     msresamp_rrrf resamp = msresamp_rrrf_create(rate, 60.0f);
 
     // Process in blocks to avoid huge intermediate allocations
@@ -80,8 +88,7 @@ DemodResult FmDemod::process(const std::vector<std::complex<float>>& iq,
     msresamp_rrrf_destroy(resamp);
 
     spdlog::info("FmDemod: {:.3f} MHz → {} audio samples @ {:.0f} Hz",
-                 center_freq_hz / 1e6, r.audio.size(),
-                 r.sample_rate.in(au::hertz));
+                 center_freq_hz / 1e6, r.audio.size(), out_sr_hz);
     return r;
 }
 

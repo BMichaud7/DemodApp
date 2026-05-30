@@ -7,22 +7,28 @@
 
 namespace demod {
 
-AmDemod::AmDemod(const std::string& modulation, int output_sample_rate)
-    : mod_(modulation), out_sr_(output_sample_rate) {}
+AmDemod::AmDemod(const std::string& modulation, au::QuantityD<au::Hertz> output_rate)
+    : mod_(modulation), out_rate_(output_rate) {}
 
 AmDemod::~AmDemod() = default;
 
 DemodResult AmDemod::process(const std::vector<std::complex<float>>& iq,
-                              double sr_sps,
-                              double center_freq_hz,
-                              int64_t timestamp_ms)
+                              au::QuantityD<au::Hertz>   sr,
+                              au::QuantityD<au::Hertz>   center_freq,
+                              au::QuantityD<au::Seconds> timestamp)
 {
+    // Extract raw values for DSP math
+    const double sr_sps         = sr.in(au::hertz);
+    const double center_freq_hz = center_freq.in(au::hertz);
+    const double out_sr_hz      = out_rate_.in(au::hertz);
+    const int    out_sr_int     = static_cast<int>(out_sr_hz);
+
     DemodResult r;
     r.type        = DemodClass::Audio;
     r.modulation  = mod_;
-    r.center_freq = au::hertz(center_freq_hz);
-    r.sample_rate = au::hertz(static_cast<double>(out_sr_));
-    r.timestamp_ms = timestamp_ms;
+    r.center_freq = center_freq;
+    r.sample_rate = out_rate_;
+    r.timestamp_ms = static_cast<int64_t>(timestamp.in(au::seconds) * 1000.0);
     r.duration    = au::seconds(iq.size() / sr_sps);
 
     liquid_ampmodem_type type = LIQUID_AMPMODEM_DSB;
@@ -42,8 +48,8 @@ DemodResult AmDemod::process(const std::vector<std::complex<float>>& iq,
         baseband.data());
     ampmodem_destroy(demod);
 
-    // Resample to out_sr_
-    float rate = static_cast<float>(out_sr_) / static_cast<float>(sr_sps);
+    // Resample to out_sr_int
+    float rate = static_cast<float>(out_sr_int) / static_cast<float>(sr_sps);
     msresamp_rrrf resamp = msresamp_rrrf_create(rate, 60.0f);
 
     constexpr unsigned int BLOCK = 4096;
@@ -63,8 +69,7 @@ DemodResult AmDemod::process(const std::vector<std::complex<float>>& iq,
     msresamp_rrrf_destroy(resamp);
 
     spdlog::info("AmDemod: {:.3f} MHz {} → {} audio samples @ {:.0f} Hz",
-                 center_freq_hz / 1e6, mod_, r.audio.size(),
-                 r.sample_rate.in(au::hertz));
+                 center_freq_hz / 1e6, mod_, r.audio.size(), out_sr_hz);
     return r;
 }
 

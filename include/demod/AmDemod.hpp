@@ -26,10 +26,11 @@ public:
     /**
      * @brief Construct an AmDemod.
      *
-     * @param modulation        Modulation type string (see class description).
-     * @param output_sample_rate Desired output PCM sample rate in Hz (default 48000).
+     * @param modulation   Modulation type string (see class description).
+     * @param output_rate  Desired output PCM sample rate (default 48 kHz).
      */
-    explicit AmDemod(const std::string& modulation, int output_sample_rate = 48000);
+    explicit AmDemod(const std::string& modulation,
+                     au::QuantityD<au::Hertz> output_rate = au::hertz(48000.0));
 
     /// @brief Destructor.
     ~AmDemod() override;
@@ -37,19 +38,20 @@ public:
     /**
      * @brief AM-demodulate an IQ block to PCM audio.
      *
-     * @param iq             Baseband IQ samples.
-     * @param sr_sps         IQ sample rate in samples/second.
-     * @param center_freq_hz Centre frequency of the capture in Hz.
-     * @param timestamp_ms   Capture start timestamp in milliseconds.
-     * @return DemodResult   with type == DemodClass::Audio.
+     * @param iq          Baseband IQ samples.
+     * @param sr          IQ sample rate.
+     * @param center_freq Centre frequency of the capture.
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult with type == DemodClass::Audio.
      */
     DemodResult process(const std::vector<std::complex<float>>& iq,
-                        double sr_sps, double center_freq_hz,
-                        int64_t timestamp_ms) override;
+                        au::QuantityD<au::Hertz>   sr,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Seconds> timestamp) override;
 
 private:
-    std::string mod_;   ///< Modulation type string.
-    int         out_sr_; ///< Output PCM sample rate in Hz.
+    std::string              mod_;      ///< Modulation type string.
+    au::QuantityD<au::Hertz> out_rate_; ///< Output PCM sample rate.
 };
 
 } // namespace demod

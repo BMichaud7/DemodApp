@@ -128,7 +128,7 @@ public:
             p.bandwidth   = au::hertz(j.value("bandwidth_hz",    0.0));
             p.symbol_rate = au::hertz(j.value("symbol_rate_sps", 0.0));
             p.confidence  = (float)j.value("confidence", 0.0);
-            p.timestamp_ms = j.value("timestamp_ms", (int64_t)0);
+            p.timestamp = au::seconds(j.value("timestamp_ms", (int64_t)0) / 1000.0);
 
             if (p.modulation.empty() || p.center_freq <= au::hertz(0.0)) return;
 
@@ -273,7 +273,7 @@ void DemodService::workerLoop() {
                                .time_since_epoch().count());
             router_.route(p.modulation, p.center_freq, p.bandwidth,
                           p.symbol_rate, p.confidence,
-                          p.timestamp_ms, req_id);
+                          p.timestamp, req_id);
         } catch (const std::exception& ex) {
             spdlog::error("DemodService: worker error: {}", ex.what());
         }
@@ -333,7 +333,7 @@ void DemodService::streamLoop(StreamPtr session, std::string stream_id)
         auto& p = session->params;
         bool ok = router_.route(p.modulation, p.center_freq, p.bandwidth,
                                 p.symbol_rate, p.confidence,
-                                p.timestamp_ms, req_id, stream_id);
+                                p.timestamp, req_id, stream_id);
         if (!ok) {
             if (++failures >= MAX_CONSECUTIVE_FAILURES) {
                 spdlog::warn("DemodService: stream {} stopping — {} consecutive IQ failures",

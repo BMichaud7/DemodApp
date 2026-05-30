@@ -39,18 +39,18 @@ public:
     /**
      * @brief Demodulate AFSK IQ data into a packed bit stream.
      *
-     * @param iq            Baseband IQ samples at the requested sample rate.
-     * @param sr_sps        Actual sample rate of the IQ data in samples/second.
-     * @param center_freq_hz Centre frequency used during capture (informational).
-     * @param timestamp_ms  Capture start timestamp in milliseconds.
-     * @return DemodResult  with type == DemodClass::Bits containing the
-     *                      packed bit stream (MSB-first, Bell 202 encoding:
-     *                      mark=1, space=0).
+     * @param iq          Baseband IQ samples at the requested sample rate.
+     * @param sr          Actual sample rate of the IQ data.
+     * @param center_freq Centre frequency used during capture (informational).
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult with type == DemodClass::Bits containing the
+     *                     packed bit stream (MSB-first, Bell 202 encoding:
+     *                     mark=1, space=0).
      */
     DemodResult process(const std::vector<std::complex<float>>& iq,
-                        double sr_sps,
-                        double center_freq_hz,
-                        int64_t timestamp_ms) override;
+                        au::QuantityD<au::Hertz>   sr,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Seconds> timestamp) override;
 };
 
 } // namespace demod

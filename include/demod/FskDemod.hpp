@@ -37,15 +37,16 @@ public:
     /**
      * @brief FSK-demodulate an IQ block to a packed bit stream.
      *
-     * @param iq             Baseband IQ samples.
-     * @param sr_sps         IQ sample rate in samples/second.
-     * @param center_freq_hz Centre frequency of the capture in Hz.
-     * @param timestamp_ms   Capture start timestamp in milliseconds.
-     * @return DemodResult   with type == DemodClass::Bits.
+     * @param iq          Baseband IQ samples.
+     * @param sr          IQ sample rate.
+     * @param center_freq Centre frequency of the capture.
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult with type == DemodClass::Bits.
      */
     DemodResult process(const std::vector<std::complex<float>>& iq,
-                        double sr_sps, double center_freq_hz,
-                        int64_t timestamp_ms) override;
+                        au::QuantityD<au::Hertz>   sr,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Seconds> timestamp) override;
 
 private:
     unsigned int m_ary_;  ///< Modulation order.

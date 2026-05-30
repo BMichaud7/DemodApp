@@ -15,6 +15,7 @@
 #include <unordered_map>
 #include <vector>
 #include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -24,12 +25,12 @@ class ServiceAmqpHandler;
  * @brief Represents a pending demodulation task queued from an AMQP message.
  */
 struct PendingDemod {
-    std::string              modulation;   ///< Detected modulation string.
-    au::QuantityD<au::Hertz> center_freq;  ///< Centre frequency.
-    au::QuantityD<au::Hertz> bandwidth;    ///< Signal bandwidth.
-    au::QuantityD<au::Hertz> symbol_rate;  ///< Symbol rate hint (0 Hz = unknown).
-    float                    confidence;   ///< Classifier confidence [0, 1].
-    int64_t                  timestamp_ms; ///< Detection timestamp in milliseconds.
+    std::string                modulation;  ///< Detected modulation string.
+    au::QuantityD<au::Hertz>   center_freq; ///< Centre frequency.
+    au::QuantityD<au::Hertz>   bandwidth;   ///< Signal bandwidth.
+    au::QuantityD<au::Hertz>   symbol_rate; ///< Symbol rate hint (0 Hz = unknown).
+    float                      confidence;  ///< Classifier confidence [0, 1].
+    au::QuantityD<au::Seconds> timestamp;   ///< Detection timestamp.
 };
 
 /**

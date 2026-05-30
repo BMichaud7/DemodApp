@@ -35,18 +35,18 @@ public:
     /**
      * @brief Decode Morse code from IQ samples.
      *
-     * @param iq            Baseband IQ samples (CW carrier near DC).
-     * @param sr_sps        Sample rate of the IQ data in samples/second.
-     * @param center_freq_hz Centre frequency used during capture (informational).
-     * @param timestamp_ms  Capture start timestamp in milliseconds.
-     * @return DemodResult  with type == DemodClass::Bits and bits containing
-     *                      the decoded ASCII text.  Returns an empty bits
-     *                      vector when no marks are detected.
+     * @param iq          Baseband IQ samples (CW carrier near DC).
+     * @param sr          Sample rate of the IQ data.
+     * @param center_freq Centre frequency used during capture (informational).
+     * @param timestamp   Capture start timestamp.
+     * @return DemodResult with type == DemodClass::Bits and bits containing
+     *                     the decoded ASCII text.  Returns an empty bits
+     *                     vector when no marks are detected.
      */
     DemodResult process(const std::vector<std::complex<float>>& iq,
-                        double sr_sps,
-                        double center_freq_hz,
-                        int64_t timestamp_ms) override;
+                        au::QuantityD<au::Hertz>   sr,
+                        au::QuantityD<au::Hertz>   center_freq,
+                        au::QuantityD<au::Seconds> timestamp) override;
 };
 
 } // namespace demod
