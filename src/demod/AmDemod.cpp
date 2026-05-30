@@ -2,6 +2,8 @@
 #include <liquid/liquid.h>
 #include <spdlog/spdlog.h>
 #include <stdexcept>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -16,12 +18,12 @@ DemodResult AmDemod::process(const std::vector<std::complex<float>>& iq,
                               int64_t timestamp_ms)
 {
     DemodResult r;
-    r.type           = DemodClass::Audio;
-    r.modulation     = mod_;
-    r.center_freq_hz = center_freq_hz;
-    r.sample_rate_hz = out_sr_;
-    r.timestamp_ms   = timestamp_ms;
-    r.duration_ms    = static_cast<int64_t>(iq.size() / sr_sps * 1000.0);
+    r.type        = DemodClass::Audio;
+    r.modulation  = mod_;
+    r.center_freq = au::hertz(center_freq_hz);
+    r.sample_rate = au::hertz(static_cast<double>(out_sr_));
+    r.timestamp_ms = timestamp_ms;
+    r.duration    = au::seconds(iq.size() / sr_sps);
 
     liquid_ampmodem_type type = LIQUID_AMPMODEM_DSB;
     int suppressed = 0;
@@ -60,8 +62,9 @@ DemodResult AmDemod::process(const std::vector<std::complex<float>>& iq,
     }
     msresamp_rrrf_destroy(resamp);
 
-    spdlog::info("AmDemod: {:.3f} MHz {} → {} audio samples @ {} Hz",
-                 center_freq_hz / 1e6, mod_, r.audio.size(), out_sr_);
+    spdlog::info("AmDemod: {:.3f} MHz {} → {} audio samples @ {:.0f} Hz",
+                 center_freq_hz / 1e6, mod_, r.audio.size(),
+                 r.sample_rate.in(au::hertz));
     return r;
 }
 

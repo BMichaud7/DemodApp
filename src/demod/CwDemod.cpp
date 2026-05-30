@@ -6,6 +6,8 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -54,12 +56,12 @@ DemodResult CwDemod::process(const std::vector<std::complex<float>>& iq,
                               int64_t timestamp_ms)
 {
     DemodResult r;
-    r.type           = DemodClass::Bits;
-    r.modulation     = "CW";
-    r.center_freq_hz = center_freq_hz;
-    r.sample_rate_hz = sr_sps;
-    r.timestamp_ms   = timestamp_ms;
-    r.duration_ms    = static_cast<int64_t>(iq.size() / sr_sps * 1000.0);
+    r.type        = DemodClass::Bits;
+    r.modulation  = "CW";
+    r.center_freq = au::hertz(center_freq_hz);
+    r.sample_rate = au::hertz(sr_sps);
+    r.timestamp_ms = timestamp_ms;
+    r.duration    = au::seconds(iq.size() / sr_sps);
 
     if (iq.empty()) return r;
 

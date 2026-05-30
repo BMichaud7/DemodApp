@@ -8,6 +8,8 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -41,27 +43,27 @@ public:
     /**
      * @brief Tune the SDR and collect a block of IQ samples.
      *
-     * @param center_freq_hz  Desired centre frequency in Hz.
-     * @param bandwidth_hz    Desired capture bandwidth in Hz.
-     * @param sample_rate_sps Desired sample rate in samples/second.
-     * @param duration_ms     Capture duration in milliseconds.
+     * @param center_freq     Desired centre frequency.
+     * @param bandwidth       Desired capture bandwidth.
+     * @param sample_rate     Desired sample rate.
+     * @param duration        Capture duration.
      * @param request_id      Correlation ID for the SDR task request.
      * @return std::vector<std::complex<float>> IQ samples on success;
      *         empty vector on error or timeout.
      */
-    std::vector<std::complex<float>> collect(double center_freq_hz,
-                                             double bandwidth_hz,
-                                             double sample_rate_sps,
-                                             int64_t duration_ms,
-                                             const std::string& request_id);
+    std::vector<std::complex<float>> collect(au::QuantityD<au::Hertz>   center_freq,
+                                             au::QuantityD<au::Hertz>   bandwidth,
+                                             au::QuantityD<au::Hertz>   sample_rate,
+                                             au::QuantityD<au::Seconds> duration,
+                                             const std::string&         request_id);
 
     /**
      * @brief Return the actual sample rate from the most recent collect() call.
      *
-     * @return double Sample rate in sps reported by the SDR backend,
-     *                or 0.0 if no successful collect() has been made.
+     * @return au::QuantityD<au::Hertz> Sample rate reported by the SDR backend,
+     *                or 0 Hz if no successful collect() has been made.
      */
-    double lastSampleRate() const { return last_sr_; }
+    au::QuantityD<au::Hertz> lastSampleRate() const { return au::hertz(last_sr_); }
 
 private:
     BrokerConfig broker_;   ///< AMQP broker configuration.

@@ -2,6 +2,8 @@
 #include <liquid/liquid.h>
 #include <spdlog/spdlog.h>
 #include <cmath>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -16,10 +18,10 @@ DemodResult FskDemod::process(const std::vector<std::complex<float>>& iq,
                                int64_t timestamp_ms)
 {
     DemodResult r;
-    r.type           = DemodClass::Bits;
-    r.center_freq_hz = center_freq_hz;
-    r.timestamp_ms   = timestamp_ms;
-    r.duration_ms    = static_cast<int64_t>(iq.size() / sr_sps * 1000.0);
+    r.type        = DemodClass::Bits;
+    r.center_freq = au::hertz(center_freq_hz);
+    r.timestamp_ms = timestamp_ms;
+    r.duration    = au::seconds(iq.size() / sr_sps);
 
     const int bps = static_cast<int>(std::log2(m_ary_));  // bits per symbol
     r.bits_per_symbol = bps;
@@ -60,7 +62,7 @@ DemodResult FskDemod::process(const std::vector<std::complex<float>>& iq,
             }
         }
         if (bit_pos < 7) r.bits.push_back(byte_acc);
-        r.sample_rate_hz = sr_sps / k;
+        r.sample_rate = au::hertz(sr_sps / k);
 
     } else {
         r.modulation = (m_ary_ == 2) ? "FSK" : (m_ary_ == 4) ? "4FSK" : "8FSK";
@@ -95,7 +97,7 @@ DemodResult FskDemod::process(const std::vector<std::complex<float>>& iq,
         }
         if (bit_pos < 7) r.bits.push_back(byte_acc);
         fskdem_destroy(demod);
-        r.sample_rate_hz = sr_sps / k;  // effective symbol rate
+        r.sample_rate = au::hertz(sr_sps / k);  // effective symbol rate
     }
 
     spdlog::info("FskDemod: {:.3f} MHz {} → {} bytes",

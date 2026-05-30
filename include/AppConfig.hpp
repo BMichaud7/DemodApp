@@ -5,6 +5,8 @@
 #pragma once
 #include <string>
 #include <cstdint>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -32,10 +34,10 @@ struct OutputConfig {
  * @brief Demodulation engine tuning parameters.
  */
 struct EngineConfig {
-    int     rank                = 4;         ///< IQ fetch priority rank (higher = higher priority).
-    int64_t audio_duration_ms   = 5'000;     ///< IQ capture duration for audio modes (ms).
-    int64_t digital_duration_ms = 2'000;     ///< IQ capture duration for digital modes (ms).
-    int     audio_sample_rate   = 48'000;    ///< Target output PCM sample rate in Hz.
+    int                       rank                = 4;              ///< IQ fetch priority rank (higher = higher priority).
+    au::QuantityD<au::Seconds> audio_duration      = au::seconds(5.0);   ///< IQ capture duration for audio modes.
+    au::QuantityD<au::Seconds> digital_duration    = au::seconds(2.0);   ///< IQ capture duration for digital modes.
+    au::QuantityD<au::Hertz>  audio_sample_rate   = au::hertz(48'000.0); ///< Target output PCM sample rate.
 };
 
 /**

@@ -1,5 +1,7 @@
 #include "IqFetcher.hpp"
 #include <sdr/Types.hpp>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 #include <proton/container.hpp>
 #include <proton/message.hpp>
@@ -226,12 +228,19 @@ IqFetcher::IqFetcher(const BrokerConfig& broker,
 
 IqFetcher::~IqFetcher() = default;
 
-std::vector<std::complex<float>> IqFetcher::collect(double center_freq_hz,
-                                                     double bandwidth_hz,
-                                                     double sample_rate_sps,
-                                                     int64_t duration_ms,
+std::vector<std::complex<float>> IqFetcher::collect(au::QuantityD<au::Hertz>   center_freq,
+                                                     au::QuantityD<au::Hertz>   bandwidth,
+                                                     au::QuantityD<au::Hertz>   sample_rate,
+                                                     au::QuantityD<au::Seconds> duration,
                                                      const std::string& req_id) {
     std::lock_guard guard(collect_mu_);
+
+    // Extract raw values for JSON serialisation
+    const double center_freq_hz  = center_freq.in(au::hertz);
+    const double bandwidth_hz    = bandwidth.in(au::hertz);
+    const double sample_rate_sps = sample_rate.in(au::hertz);
+    const double duration_s      = duration.in(au::seconds);
+    const int64_t duration_ms    = static_cast<int64_t>(duration_s * 1000.0);
 
     auto now_ms = duration_cast<milliseconds>(
         system_clock::now().time_since_epoch()).count();
@@ -304,7 +313,7 @@ std::vector<std::complex<float>> IqFetcher::collect(double center_freq_hz,
         fd = openBoundUdpSocket(static_cast<uint16_t>(udp_port));
     }
 
-    int n_samples = static_cast<int>(sample_rate_sps * duration_ms / 1000.0);
+    int n_samples = static_cast<int>(sample_rate_sps * duration_s);
     auto iq = receiveIq(fd, n_samples, timeout);
     ::close(fd);
 

@@ -98,6 +98,19 @@ endif()
 # ── tinyxml2 ──────────────────────────────────────────────────────────────────
 pkg_check_modules(TINYXML2 REQUIRED IMPORTED_TARGET tinyxml2)
 
+# ── Au units (header-only) ────────────────────────────────────────────────────
+# Au is already fetched by SdrSdk when it is used as a subdirectory; add a
+# fallback FetchContent block so DemodApp can also be built standalone.
+if(NOT TARGET Au::au)
+    include(FetchContent)
+    FetchContent_Declare(Au
+        GIT_REPOSITORY https://github.com/aurora-opensource/au
+        GIT_TAG        "0.5.1"
+        GIT_SHALLOW    TRUE
+        EXCLUDE_FROM_ALL)
+    FetchContent_MakeAvailable(Au)
+endif()
+
 # ── Library ───────────────────────────────────────────────────────────────────
 add_library(demod_lib STATIC
     src/AppConfig.cpp
@@ -119,6 +132,7 @@ target_link_libraries(demod_lib PUBLIC
     spdlog::spdlog
     PkgConfig::TINYXML2
     Threads::Threads
+    Au::au
 )
 if(TARGET Proton::cpp)
     target_link_libraries(demod_lib PUBLIC Proton::cpp)

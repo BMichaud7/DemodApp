@@ -4,6 +4,8 @@
 #include <cmath>
 #include <stdexcept>
 #include <unordered_map>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -38,11 +40,11 @@ DemodResult PskQamDemod::process(const std::vector<std::complex<float>>& iq,
                                   int64_t timestamp_ms)
 {
     DemodResult r;
-    r.type           = DemodClass::Bits;
-    r.modulation     = mod_;
-    r.center_freq_hz = center_freq_hz;
-    r.timestamp_ms   = timestamp_ms;
-    r.duration_ms    = static_cast<int64_t>(iq.size() / sr_sps * 1000.0);
+    r.type        = DemodClass::Bits;
+    r.modulation  = mod_;
+    r.center_freq = au::hertz(center_freq_hz);
+    r.timestamp_ms = timestamp_ms;
+    r.duration    = au::seconds(iq.size() / sr_sps);
 
     modulation_scheme scheme = schemeFor(mod_);
 
@@ -69,7 +71,7 @@ DemodResult PskQamDemod::process(const std::vector<std::complex<float>>& iq,
     modem dem = modem_create(scheme);
     int bps = static_cast<int>(modem_get_bps(dem));
     r.bits_per_symbol = bps;
-    r.sample_rate_hz  = sym_rate;
+    r.sample_rate     = au::hertz(sym_rate);
 
     r.bits.reserve(static_cast<size_t>(iq.size() / k * bps / 8 + 8));
     uint8_t byte_acc = 0;

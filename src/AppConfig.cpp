@@ -1,6 +1,8 @@
 #include "AppConfig.hpp"
 #include <tinyxml2.h>
 #include <stdexcept>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -59,10 +61,10 @@ AppConfig AppConfig::fromXml(const std::string& path) {
     }
 
     if (auto* e = root->FirstChildElement("engine")) {
-        cfg.engine.rank                = (int)optD(e, "rank", 3);
-        cfg.engine.audio_duration_ms   = optI64(e, "audio_duration_ms", 5000);
-        cfg.engine.digital_duration_ms = optI64(e, "digital_duration_ms", 2000);
-        cfg.engine.audio_sample_rate   = (int)optD(e, "audio_sample_rate_hz", 48000);
+        cfg.engine.rank             = (int)optD(e, "rank", 3);
+        cfg.engine.audio_duration   = au::seconds(optI64(e, "audio_duration_ms",   5000) / 1000.0);
+        cfg.engine.digital_duration = au::seconds(optI64(e, "digital_duration_ms", 2000) / 1000.0);
+        cfg.engine.audio_sample_rate = au::hertz(optD(e, "audio_sample_rate_hz", 48000.0));
     }
 
     return cfg;

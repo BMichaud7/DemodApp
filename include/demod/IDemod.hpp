@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 namespace demod {
 
@@ -29,14 +31,14 @@ enum class DemodClass {
  * selected by @p type.
  */
 struct DemodResult {
-    DemodClass  type;             ///< Which output field is valid.
-    std::string modulation;       ///< Modulation identifier (e.g. "FM_WB").
-    double      center_freq_hz;   ///< Centre frequency of the captured signal.
-    double      sample_rate_hz;   ///< Output PCM rate (Audio) or symbol rate (Bits).
-    int64_t     timestamp_ms;     ///< Capture start time (UNIX milliseconds).
-    int64_t     duration_ms;      ///< Duration of the captured block.
-    int         bits_per_symbol = 1; ///< Bits per symbol for digital modes.
-    std::string stream_id;          ///< Non-empty when produced by a streaming session.
+    DemodClass               type;            ///< Which output field is valid.
+    std::string              modulation;      ///< Modulation identifier (e.g. "FM_WB").
+    au::QuantityD<au::Hertz> center_freq;     ///< Centre frequency of the captured signal.
+    au::QuantityD<au::Hertz> sample_rate;     ///< Output PCM rate (Audio) or symbol rate (Bits).
+    int64_t                  timestamp_ms;    ///< Capture start time (UNIX milliseconds).
+    au::QuantityD<au::Seconds> duration;      ///< Duration of the captured block.
+    int                      bits_per_symbol = 1; ///< Bits per symbol for digital modes.
+    std::string              stream_id;       ///< Non-empty when produced by a streaming session.
 
     // Exactly one of these is populated:
     std::vector<float>               audio;  ///< PCM float32, typically 48 kHz mono.
@@ -48,12 +50,12 @@ struct DemodResult {
  * @brief Parameters used by DemodRouter to request IQ samples and route them.
  */
 struct DemodParams {
-    double     sample_rate_sps;       ///< Requested IQ sample rate in sps.
-    double     bandwidth_hz;          ///< Requested capture bandwidth in Hz.
-    int64_t    duration_ms;           ///< Duration of IQ capture in milliseconds.
-    DemodClass out_class;             ///< Expected output class.
-    int        m_ary = 2;             ///< FSK/PSK/QAM modulation order.
-    double     fm_deviation_hz = 0;   ///< FM peak deviation (FM modes only).
+    au::QuantityD<au::Hertz>  sample_rate;    ///< Requested IQ sample rate.
+    au::QuantityD<au::Hertz>  bandwidth;      ///< Requested capture bandwidth.
+    au::QuantityD<au::Seconds> duration;      ///< Duration of IQ capture.
+    DemodClass                 out_class;     ///< Expected output class.
+    int                        m_ary = 2;    ///< FSK/PSK/QAM modulation order.
+    au::QuantityD<au::Hertz>  fm_deviation;  ///< FM peak deviation (FM modes only).
 };
 
 /**

@@ -1,4 +1,6 @@
 #include "DemodService.hpp"
+#include "au/units/hertz.hh"
+#include "au/units/seconds.hh"
 
 #include <proton/container.hpp>
 #include <proton/message.hpp>
@@ -121,14 +123,14 @@ public:
             if (msg_type != "DEMOD_REQUEST" && msg_type != "START_DEMOD_STREAM") return;
 
             PendingDemod p;
-            p.modulation      = j.value("modulation", std::string(""));
-            p.center_freq_hz  = j.value("center_freq_hz", 0.0);
-            p.bandwidth_hz    = j.value("bandwidth_hz", 0.0);
-            p.symbol_rate_sps = j.value("symbol_rate_sps", 0.0);
-            p.confidence      = (float)j.value("confidence", 0.0);
-            p.timestamp_ms    = j.value("timestamp_ms", (int64_t)0);
+            p.modulation  = j.value("modulation", std::string(""));
+            p.center_freq = au::hertz(j.value("center_freq_hz",  0.0));
+            p.bandwidth   = au::hertz(j.value("bandwidth_hz",    0.0));
+            p.symbol_rate = au::hertz(j.value("symbol_rate_sps", 0.0));
+            p.confidence  = (float)j.value("confidence", 0.0);
+            p.timestamp_ms = j.value("timestamp_ms", (int64_t)0);
 
-            if (p.modulation.empty() || p.center_freq_hz <= 0) return;
+            if (p.modulation.empty() || p.center_freq <= au::hertz(0.0)) return;
 
             if (msg_type == "START_DEMOD_STREAM") {
                 std::string sid = j.value("stream_id", std::string(""));
@@ -245,7 +247,7 @@ void DemodService::subscriptionLoop() {
 
 void DemodService::onDemodRequest(const PendingDemod& p) {
     spdlog::info("DemodService: DEMOD_REQUEST {:.3f} MHz mod={}",
-                 p.center_freq_hz / 1e6, p.modulation);
+                 p.center_freq.in(au::hertz) / 1e6, p.modulation);
     {
         std::lock_guard lk(q_mu_);
         queue_.push(p);
@@ -269,8 +271,8 @@ void DemodService::workerLoop() {
             std::string req_id = "demod-" +
                 std::to_string(std::chrono::steady_clock::now()
                                .time_since_epoch().count());
-            router_.route(p.modulation, p.center_freq_hz, p.bandwidth_hz,
-                          p.symbol_rate_sps, p.confidence,
+            router_.route(p.modulation, p.center_freq, p.bandwidth,
+                          p.symbol_rate, p.confidence,
                           p.timestamp_ms, req_id);
         } catch (const std::exception& ex) {
             spdlog::error("DemodService: worker error: {}", ex.what());
@@ -293,7 +295,7 @@ void DemodService::startStream(const std::string& stream_id, const PendingDemod&
         streams_[stream_id] = std::move(sp);
     }
     spdlog::info("DemodService: starting stream {} for {:.3f} MHz {}",
-                 stream_id, p.center_freq_hz / 1e6, p.modulation);
+                 stream_id, p.center_freq.in(au::hertz) / 1e6, p.modulation);
     std::lock_guard lk(thread_mu_);
     stream_threads_.emplace_back([this, stream_id]() {
         StreamPtr session;
@@ -329,8 +331,8 @@ void DemodService::streamLoop(StreamPtr session, std::string stream_id)
     while (session->active.load() && running_.load()) {
         std::string req_id = stream_id + "-" + std::to_string(chunk++);
         auto& p = session->params;
-        bool ok = router_.route(p.modulation, p.center_freq_hz, p.bandwidth_hz,
-                                p.symbol_rate_sps, p.confidence,
+        bool ok = router_.route(p.modulation, p.center_freq, p.bandwidth,
+                                p.symbol_rate, p.confidence,
                                 p.timestamp_ms, req_id, stream_id);
         if (!ok) {
             if (++failures >= MAX_CONSECUTIVE_FAILURES) {
@@ -351,10 +353,14 @@ void DemodService::streamLoop(StreamPtr session, std::string stream_id)
 
 void DemodService::publishResult(const DemodResult& r) {
     // ── Write file ───────────────────────────────────────────────────────────
+    const double cf_hz = r.center_freq.in(au::hertz);
+    const double sr_hz = r.sample_rate.in(au::hertz);
+    const int64_t dur_ms = static_cast<int64_t>(r.duration.in(au::seconds) * 1000.0);
+
     auto ts = std::to_string(r.timestamp_ms);
     std::ostringstream fn;
     fn << cfg_.output.output_dir << "/"
-       << std::fixed << std::setprecision(3) << (r.center_freq_hz / 1e6)
+       << std::fixed << std::setprecision(3) << (cf_hz / 1e6)
        << "MHz_" << r.modulation;
     if (!r.stream_id.empty())
         fn << "_stream-" << r.stream_id.substr(0, 8);
@@ -363,7 +369,7 @@ void DemodService::publishResult(const DemodResult& r) {
     if (r.type == DemodClass::Audio && !r.audio.empty()) {
         std::string wav_path = fn.str() + ".wav";
         try {
-            writeWav(wav_path, r.audio, static_cast<int>(r.sample_rate_hz));
+            writeWav(wav_path, r.audio, static_cast<int>(sr_hz));
             spdlog::info("DemodService: wrote {}", wav_path);
         } catch (const std::exception& ex) {
             spdlog::warn("DemodService: WAV write failed: {}", ex.what());
@@ -393,16 +399,16 @@ void DemodService::publishResult(const DemodResult& r) {
     json j;
     j["msg_type"]        = "DEMOD_RESULT";
     j["schema_version"]  = "1.0";
-    j["center_freq_hz"]  = r.center_freq_hz;
+    j["center_freq_hz"]  = cf_hz;
     j["modulation"]      = r.modulation;
     j["timestamp_ms"]    = r.timestamp_ms;
-    j["duration_ms"]     = r.duration_ms;
+    j["duration_ms"]     = dur_ms;
     if (!r.stream_id.empty())
         j["stream_id"]   = r.stream_id;
 
     if (r.type == DemodClass::Audio) {
         j["demod_class"]     = "audio";
-        j["sample_rate_hz"]  = r.sample_rate_hz;
+        j["sample_rate_hz"]  = sr_hz;
         j["channels"]        = 1;
         j["format"]          = "pcm_f32le";
         j["num_samples"]     = r.audio.size();
@@ -411,7 +417,7 @@ void DemodService::publishResult(const DemodResult& r) {
                 r.audio.data(), r.audio.size() * sizeof(float));
     } else if (r.type == DemodClass::Bits) {
         j["demod_class"]      = "bits";
-        j["symbol_rate_sps"]  = r.sample_rate_hz;
+        j["symbol_rate_sps"]  = sr_hz;
         j["bits_per_symbol"]  = r.bits_per_symbol;
         j["num_bits"]         = r.bits.size() * 8;
         if (!r.bits.empty())
@@ -419,7 +425,7 @@ void DemodService::publishResult(const DemodResult& r) {
                 r.bits.data(), r.bits.size());
     } else {
         j["demod_class"]     = "raw_iq";
-        j["sample_rate_hz"]  = r.sample_rate_hz;
+        j["sample_rate_hz"]  = sr_hz;
         j["num_samples"]     = r.raw_iq.size();
         if (!r.raw_iq.empty())
             j["data_b64"] = sdr::base64::encode(
