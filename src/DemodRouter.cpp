@@ -161,7 +161,7 @@ bool DemodRouter::route(const std::string&         modulation,
             AfskDemod d;
             result = d.process(iq, actual_sr, center_freq, timestamp);
         } else {
-            PskQamDemod d(modulation, symbol_rate.in(au::hertz));
+            PskQamDemod d(modulation, symbol_rate);
             result = d.process(iq, actual_sr, center_freq, timestamp);
         }
     } else {
