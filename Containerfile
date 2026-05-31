@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libtinyxml2-dev \
         libspdlog-dev \
         libfmt-dev \
+        libfftw3-dev \
         nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
