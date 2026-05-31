@@ -114,7 +114,7 @@ spec:
 
       containers:
         - name: sdr-demod
-          image: ghcr.io/bmichaud7/sdr-demod:1.0.0
+          image: ghcr.io/bmichaud7/sdr-demod:1.1.0
           imagePullPolicy: Always
 
           env:
