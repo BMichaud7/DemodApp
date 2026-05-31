@@ -29,8 +29,8 @@ static modulation_scheme schemeFor(const std::string& mod) {
 
 
 PskQamDemod::PskQamDemod(const std::string& modulation,
-                         double symbol_rate_hint_sps)
-    : mod_(modulation), sym_rate_hint_(symbol_rate_hint_sps) {}
+                         au::QuantityD<au::Hertz> symbol_rate_hint_sps)
+    : mod_(modulation), sym_rate_hint_(symbol_rate_hint_sps.in(au::hertz)) {}
 
 PskQamDemod::~PskQamDemod() = default;
 

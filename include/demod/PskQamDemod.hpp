@@ -4,6 +4,7 @@
  */
 #pragma once
 #include "IDemod.hpp"
+#include <au/units/hertz.hh>
 #include <string>
 
 namespace demod {
@@ -31,7 +32,7 @@ public:
      *                             Pass 0 to let the demodulator decide.
      */
     explicit PskQamDemod(const std::string& modulation,
-                         double symbol_rate_hint_sps = 0.0);
+                         au::QuantityD<au::Hertz> symbol_rate_hint_sps = au::hertz(0.0));
 
     /// @brief Destructor.
     ~PskQamDemod() override;
