@@ -1,10 +1,10 @@
 # ── Stage 1: build ────────────────────────────────────────────────────────────
-# Build context: /home/brendan  (podman build -f DemodApp/Containerfile -t sdr-demod:1.0 .)
+# Build context: /home/brendan  (podman build -f DemodApp/Containerfile -t sdr-demod:1.1.0 .)
 FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential cmake git pkg-config \
+        build-essential cmake git pkg-config ca-certificates \
         libliquid-dev \
         libqpid-proton-cpp12-dev \
         libtinyxml2-dev \
@@ -13,14 +13,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY SdrTaskApi/ /build/SdrTaskApi/
-COPY DemodApp/   /build/DemodApp/
+# Clone SdrSdk (brings in Au via FetchContent) and SdrTaskApi as sibling deps
+RUN git clone --depth 1 --branch "main/1.0" \
+        https://github.com/BMichaud7/SdrSdk.git /build/SdrSdk && \
+    git clone --depth 1 --branch "main/1.0" \
+        https://github.com/BMichaud7/SdrTaskApi.git /build/SdrTaskApi
+
+COPY DemodApp/ /build/DemodApp/
 
 WORKDIR /build/DemodApp
 RUN cmake -B build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/install \
         -DBUILD_TESTING=OFF \
+        -DFETCHCONTENT_QUIET=OFF \
     && cmake --build build --parallel "$(nproc)" \
     && cmake --install build
 
