@@ -31,16 +31,14 @@ public:
             copts.user(mon_.cfg_.broker.username);
         if (!mon_.cfg_.broker.password.empty())
             copts.password(mon_.cfg_.broker.password);
+        c.connect(mon_.cfg_.broker.url, copts);
+    }
 
-        // Subscribe to rf.detections
-        auto conn = c.connect(mon_.cfg_.broker.url, copts);
+    void on_connection_open(proton::connection& conn) override {
         conn.open_receiver("rf.detections",
             proton::receiver_options().source(
                 proton::source_options().address("rf.detections")));
-
-        // Also open a sender for rf.p25.grants
         sender_ = conn.open_sender(mon_.p25cfg_.grant_topic);
-
         spdlog::info("[P25Monitor] connected → {} | grants → {}",
                      mon_.cfg_.broker.url, mon_.p25cfg_.grant_topic);
     }
@@ -119,10 +117,10 @@ void P25Monitor::decode_control_channel(double freq_hz) {
     auto bw_qty = au::hertz(12500.0);
     auto dur_qty = au::seconds(p25cfg_.capture_s);
 
-    auto samples = fetcher_.fetch(
-        sr_qty,
-        bw_qty,
+    auto samples = fetcher_.collect(
         au::hertz(freq_hz),
+        bw_qty,
+        sr_qty,
         dur_qty,
         "p25-ctrl");
 
