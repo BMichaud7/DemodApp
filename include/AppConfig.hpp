@@ -38,6 +38,7 @@ struct EngineConfig {
     au::QuantityD<au::Seconds> audio_duration      = au::seconds(5.0);   ///< IQ capture duration for audio modes.
     au::QuantityD<au::Seconds> digital_duration    = au::seconds(2.0);   ///< IQ capture duration for digital modes.
     au::QuantityD<au::Hertz>  audio_sample_rate   = au::hertz(48'000.0); ///< Target output PCM sample rate.
+    float                     min_confidence      = 0.70f;          ///< Minimum classifier confidence to trigger demodulation.
 };
 
 /**
