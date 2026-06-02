@@ -21,7 +21,8 @@ jobs:
             libqpid-proton-cpp12-dev \
             libliquid-dev \
             libtinyxml2-dev \
-            libfmt-dev
+            libfmt-dev \
+            libfftw3-dev
 
       - name: Clone SdrSdk (sibling dependency)
         run: |
