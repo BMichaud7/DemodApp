@@ -119,12 +119,15 @@ add_library(demod_lib STATIC
     src/IqFetcher.cpp
     src/DemodRouter.cpp
     src/DemodService.cpp
+    src/P25Monitor.cpp
     src/demod/FmDemod.cpp
     src/demod/AmDemod.cpp
     src/demod/FskDemod.cpp
     src/demod/PskQamDemod.cpp
     src/demod/CwDemod.cpp
     src/demod/AfskDemod.cpp
+    src/demod/C4FmDemod.cpp
+    src/demod/P25ControlDecoder.cpp
 )
 target_include_directories(demod_lib PUBLIC include)
 target_link_libraries(demod_lib PUBLIC

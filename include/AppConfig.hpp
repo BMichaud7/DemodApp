@@ -48,11 +48,22 @@ struct EngineConfig {
  * Aggregates broker, output, and engine configuration sections.
  * Load from an XML file with fromXml().
  */
+/// P25 trunked-system monitor configuration.
+struct P25MonitorConfig {
+    bool        enabled          = false;
+    double      control_freq_hz  = 0.0;    ///< 0 = auto-detect from rf.detections
+    double      sample_rate_hz   = 48000.0;
+    double      capture_s        = 3.0;
+    std::string grant_topic      = "rf.p25.grants";
+    std::vector<uint32_t> tg_whitelist; ///< empty = all talk groups
+};
+
 struct AppConfig {
-    BrokerConfig broker; ///< AMQP broker settings.
-    OutputConfig output; ///< Output settings.
-    EngineConfig engine; ///< Engine tuning settings.
-    std::string  local_ip = "127.0.0.1"; ///< Local IP for IQ fetch callbacks.
+    BrokerConfig     broker; ///< AMQP broker settings.
+    OutputConfig     output; ///< Output settings.
+    EngineConfig     engine; ///< Engine tuning settings.
+    P25MonitorConfig p25;    ///< P25 control channel monitor settings.
+    std::string      local_ip = "127.0.0.1"; ///< Local IP for IQ fetch callbacks.
 
     /**
      * @brief Parse an XML configuration file and return an AppConfig.
