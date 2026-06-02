@@ -180,6 +180,7 @@ if(BUILD_TESTING)
         tests/test_cw_demod.cpp
         tests/test_afsk_demod.cpp
         tests/test_config.cpp
+        tests/test_p25_decoder.cpp
     )
     target_include_directories(demod_tests PRIVATE tests)
     target_link_libraries(demod_tests PRIVATE
