@@ -56,6 +56,7 @@ private:
     // TSBK processing
     void process_frame(const uint8_t* bits, size_t n_bits);
     void decode_tsbk(const uint8_t* payload);
+    void decode_hdu(const uint8_t* bits, size_t n_bits);  ///< Extract ALGID+KID from voice channel HDU
 
     // Channel frequency resolution
     double resolve_freq(uint8_t iden, uint16_t channel_num) const;
@@ -73,6 +74,10 @@ private:
     uint64_t             sync_reg_ = 0;
     bool                 synced_   = false;
     int                  bits_since_sync_ = 0;
+
+    // Most-recently-decoded HDU encryption info (updated on each voice channel HDU)
+    AlgId                last_hdu_alg_ = AlgId::UNKN;
+    uint16_t             last_hdu_kid_ = 0;
 
     static constexpr int FRAME_BITS = 196;  ///< P25 TSBK frame size in bits
 };

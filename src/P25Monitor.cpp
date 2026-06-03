@@ -176,6 +176,9 @@ void P25Monitor::publish_grant(const p25::ChannelGrant& grant) {
     j["channel_iden"] = grant.channel_iden;
     j["channel_num"]  = grant.channel_num;
     j["encrypted"]    = grant.encrypted;
+    j["alg_id"]       = static_cast<int>(grant.alg_id);
+    j["alg_name"]     = grant.alg_name();
+    j["key_id"]       = grant.key_id;
     j["emergency"]    = grant.emergency;
     j["site"] = {
         {"wacn",    decoder_->site_info().wacn},

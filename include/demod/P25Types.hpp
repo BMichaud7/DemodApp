@@ -27,6 +27,47 @@ enum class Duid : uint8_t {
     UNKN = 0xFF,
 };
 
+/**
+ * @brief P25 encryption algorithm identifiers (TIA-102.AABF).
+ *
+ * Carried in the Header Data Unit (HDU) of every encrypted voice channel.
+ * The HDU is the first frame on the voice channel and contains ALGID + KID.
+ */
+enum class AlgId : uint8_t {
+    CLEAR    = 0x00,  ///< Unencrypted — no algorithm
+    DES_OFB  = 0x41,  ///< DVP (DES-OFB) — legacy Motorola
+    DES_XL   = 0x42,  ///< DES-XL — legacy
+    DES      = 0x01,  ///< DES (56-bit) — obsolete
+    TDEA_2   = 0x02,  ///< 2-key Triple DES
+    TDEA_3   = 0x03,  ///< 3-key Triple DES (112/168-bit)
+    AES_256  = 0x04,  ///< AES-256 — most common modern standard
+    ARC4     = 0x1F,  ///< ARC4 / RC4
+    MOTOROLA = 0x80,  ///< Motorola vendor-specific
+    HARRIS   = 0x21,  ///< Harris/L3 vendor-specific
+    UNKN     = 0xFF,
+};
+
+/// @brief Return a human-readable name for an ALGID.
+inline const char* algid_name(AlgId id) {
+    switch (id) {
+        case AlgId::CLEAR:    return "Clear";
+        case AlgId::DES_OFB:  return "DVP (DES-OFB)";
+        case AlgId::DES_XL:   return "DES-XL";
+        case AlgId::DES:      return "DES";
+        case AlgId::TDEA_2:   return "2-key TDEA";
+        case AlgId::TDEA_3:   return "3-key TDEA";
+        case AlgId::AES_256:  return "AES-256";
+        case AlgId::ARC4:     return "ARC4";
+        case AlgId::MOTOROLA: return "Motorola Vendor";
+        case AlgId::HARRIS:   return "Harris Vendor";
+        default: {
+            uint8_t v = static_cast<uint8_t>(id);
+            if (v >= 0x80) return "Vendor-specific";
+            return "Unknown";
+        }
+    }
+}
+
 // TSBK Opcodes
 enum class TsbkOpcode : uint8_t {
     GRP_V_CH_GRANT     = 0x00,  ///< Group Voice Channel Grant
@@ -58,6 +99,10 @@ struct ChannelGrant {
     double          freq_hz;      ///< Resolved frequency (0 if channel map not yet received)
     bool            encrypted;
     bool            emergency;
+    // Encryption details — populated from voice channel HDU when followed
+    AlgId           alg_id  = AlgId::UNKN;  ///< Encryption algorithm (from HDU)
+    uint16_t        key_id  = 0;            ///< Key ID (from HDU, 0 if unknown)
+    std::string     alg_name() const { return algid_name(alg_id); }
 };
 
 /// P25 Network/Site identifiers (from RFSS_STATUS_BCAST)

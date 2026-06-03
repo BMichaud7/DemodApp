@@ -122,6 +122,12 @@ void P25ControlDecoder::process_frame(const uint8_t* bits, size_t n_bits) {
     uint8_t duid = nid & 0xFu;
     // uint16_t nac = (nid >> 4) & 0xFFFu;  // network access code (ignored here)
 
+    // HDU on voice channel — extract encryption algorithm + key ID
+    if (duid == static_cast<uint8_t>(Duid::HDU)) {
+        decode_hdu(bits + 16, n_bits - 16);
+        return;
+    }
+
     if (duid != static_cast<uint8_t>(Duid::TSBK)) return;
 
     // Remaining 180 bits: TSBK payload (12 bytes + 2 CRC = 14 bytes = 112 bits)
@@ -140,6 +146,36 @@ void P25ControlDecoder::process_frame(const uint8_t* bits, size_t n_bits) {
 }
 
 // ── TSBK decoding ─────────────────────────────────────────────────────────────
+
+// ── HDU decoding ──────────────────────────────────────────────────────────────
+// HDU bit layout after NID (TIA-102.AABC):
+//   Bits 0-7:    Reserved / MFID (manufacturer ID)
+//   Bits 8-27:   NAID (Network Access ID, 20 bits)
+//   Bits 28-35:  ALGID (algorithm ID, 8 bits)  ← what we want
+//   Bits 36-51:  KID  (key ID, 16 bits)         ← what we want
+//   Bits 52-123: MI   (message indicator, 72 bits)
+void P25ControlDecoder::decode_hdu(const uint8_t* bits, size_t n_bits) {
+    if (n_bits < 52) return;
+
+    // Extract ALGID from bits 28–35
+    uint8_t algid_raw = 0;
+    for (int i = 28; i < 36 && i < (int)n_bits; ++i)
+        algid_raw = static_cast<uint8_t>((algid_raw << 1) | bits[i]);
+
+    // Extract KID from bits 36–51
+    uint16_t kid = 0;
+    for (int i = 36; i < 52 && i < (int)n_bits; ++i)
+        kid = static_cast<uint16_t>((kid << 1) | bits[i]);
+
+    AlgId alg = static_cast<AlgId>(algid_raw);
+
+    spdlog::info("P25 HDU: ALGID=0x{:02X} ({}) KID=0x{:04X}",
+                 algid_raw, algid_name(alg), kid);
+
+    // Update most recent grant's encryption info (last active TG)
+    last_hdu_alg_ = alg;
+    last_hdu_kid_ = kid;
+}
 
 void P25ControlDecoder::decode_tsbk(const uint8_t* p) {
     uint8_t  opcode  = p[0] & 0x3Fu;
