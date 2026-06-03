@@ -31,6 +31,17 @@ RUN cmake -B build \
     && cmake --build build --parallel "$(nproc)" \
     && cmake --install build
 
+# ── Stage: test (run with --target test) ─────────────────────────────────────
+# podman build --target test -t sdr-demod:test -f DemodApp/Containerfile .
+# podman run --rm sdr-demod:test
+FROM builder AS test
+RUN cmake -B build_test \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=ON \
+        -DFETCHCONTENT_QUIET=OFF \
+    && cmake --build build_test --parallel "$(nproc)" --target demod_tests
+RUN ctest --test-dir build_test --output-on-failure -V --timeout 120
+
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
 FROM ubuntu:24.04
 
