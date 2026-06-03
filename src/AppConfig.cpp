@@ -65,6 +65,23 @@ AppConfig AppConfig::fromXml(const std::string& path) {
         cfg.engine.audio_duration   = au::seconds(optI64(e, "audio_duration_ms",   5000) / 1000.0);
         cfg.engine.digital_duration = au::seconds(optI64(e, "digital_duration_ms", 2000) / 1000.0);
         cfg.engine.audio_sample_rate = au::hertz(optD(e, "audio_sample_rate_hz", 48000.0));
+        if (auto* c = e->FirstChildElement("min_confidence"))
+            cfg.engine.min_confidence = (float)optD(e, "min_confidence", 0.70);
+    }
+
+    // ── Threat detection ─────────────────────────────────────────────────────
+    if (auto* th = root->FirstChildElement("threat")) {
+        auto boolEl = [&](const char* tag, bool def) -> bool {
+            std::string v = optText(th, tag, def ? "true" : "false");
+            return (v == "true" || v == "1" || v == "yes");
+        };
+        cfg.threat.enabled          = boolEl("enabled",          false);
+        cfg.threat.adsb_enabled     = boolEl("adsb_enabled",     true);
+        cfg.threat.ais_enabled      = boolEl("ais_enabled",      true);
+        cfg.threat.eas_enabled      = boolEl("eas_enabled",      true);
+        cfg.threat.dsc_enabled      = boolEl("dsc_enabled",      true);
+        cfg.threat.p25_rogue_enabled= boolEl("p25_rogue_enabled",true);
+        cfg.threat.alert_topic      = optText(th, "alert_topic", "rf.alerts");
     }
 
     return cfg;

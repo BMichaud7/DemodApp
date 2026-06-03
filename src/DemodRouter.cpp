@@ -316,8 +316,24 @@ bool DemodRouter::route(const std::string&         modulation,
     }
 
     result.stream_id = stream_id;
-    if (!result.alert_json.empty() && on_alert_)
-        on_alert_(result.alert_json, center_freq.in(au::hertz));
+
+    // Suppress alert if threat detection is disabled globally or per-validator.
+    if (!result.alert_json.empty()) {
+        bool emit = cfg_.threat.enabled;
+        if (emit) {
+            // Per-validator flag check based on alert type in JSON
+            const auto& j = result.alert_json;
+            if      (j.find("ADSB")     != std::string::npos) emit = cfg_.threat.adsb_enabled;
+            else if (j.find("AIS")      != std::string::npos) emit = cfg_.threat.ais_enabled;
+            else if (j.find("EAS")      != std::string::npos) emit = cfg_.threat.eas_enabled;
+            else if (j.find("DSC")      != std::string::npos) emit = cfg_.threat.dsc_enabled;
+            else if (j.find("P25_ROGUE")!= std::string::npos) emit = cfg_.threat.p25_rogue_enabled;
+        }
+        if (emit && on_alert_)
+            on_alert_(result.alert_json, center_freq.in(au::hertz));
+        else
+            result.alert_json.clear();  // don't propagate suppressed alerts
+    }
     on_result_(result);
     return true;
 }

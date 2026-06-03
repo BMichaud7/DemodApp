@@ -36,4 +36,37 @@
     <audio_sample_rate_hz>48000</audio_sample_rate_hz>
   </engine>
 
+
+  <!-- ── Threat detection validators ──────────────────────────────────────── -->
+  <!-- Master switch: must be true for any validator to run.
+       Individual flags let you enable only the protocols you care about.
+       Alerts published to rf.alerts, persisted to rf_alerts PostgreSQL table.
+
+       Query recent alerts:
+         SELECT * FROM recent_alerts;  -->
+  <threat>
+    <enabled>false</enabled>
+
+    <!-- ADS-B: impossible altitude (>60 000 ft) or groundspeed (>700 kt)
+         → ADSB_SPOOFING HIGH; CRC failure rate >80% → ADSB_JAMMING HIGH -->
+    <adsb_enabled>true</adsb_enabled>
+
+    <!-- AIS: speed over ground >50 kt or invalid MMSI → AIS_SPOOFING -->
+    <ais_enabled>true</ais_enabled>
+
+    <!-- EAS/SAME: invalid FCC originator code or rare national event
+         (EAN/NPT/EVI/CDW/VOW/EQW) → EAS_SPOOFING -->
+    <eas_enabled>true</eas_enabled>
+
+    <!-- DSC: distress (cat 112) with invalid MMSI → DSC_SPOOFING CRITICAL.
+         All distress calls also logged at MEDIUM severity for review. -->
+    <dsc_enabled>true</dsc_enabled>
+
+    <!-- P25: WACN or SYS_ID changes mid-session → P25_ROGUE_SITE HIGH -->
+    <p25_rogue_enabled>true</p25_rogue_enabled>
+
+    <!-- AMQP topic for alert messages (must match scanner.xml <alert_topic>) -->
+    <alert_topic>rf.alerts</alert_topic>
+  </threat>
+
 </demod_config>

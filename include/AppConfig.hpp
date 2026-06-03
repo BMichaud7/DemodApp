@@ -58,12 +58,29 @@ struct P25MonitorConfig {
     std::vector<uint32_t> tg_whitelist; ///< empty = all talk groups
 };
 
+/**
+ * @brief Threat detection validator enable/disable flags for DemodApp.
+ *
+ * Loaded from demod.xml <threat> block. Master enabled must be true
+ * for any individual validator to be active.
+ */
+struct ThreatDetectionConfig {
+    bool enabled{false};          ///< Master switch.
+    bool adsb_enabled{true};      ///< ADS-B physics + CRC-rate validator.
+    bool ais_enabled{true};       ///< AIS vessel physics + MMSI validator.
+    bool eas_enabled{true};       ///< EAS/SAME originator + event validator.
+    bool dsc_enabled{true};       ///< DSC distress MMSI validator.
+    bool p25_rogue_enabled{true}; ///< P25 rogue site (WACN change) detector.
+    std::string alert_topic{"rf.alerts"}; ///< AMQP topic for alert messages.
+};
+
 struct AppConfig {
-    BrokerConfig     broker; ///< AMQP broker settings.
-    OutputConfig     output; ///< Output settings.
-    EngineConfig     engine; ///< Engine tuning settings.
-    P25MonitorConfig p25;    ///< P25 control channel monitor settings.
-    std::string      local_ip = "127.0.0.1"; ///< Local IP for IQ fetch callbacks.
+    BrokerConfig          broker;  ///< AMQP broker settings.
+    OutputConfig          output;  ///< Output settings.
+    EngineConfig          engine;  ///< Engine tuning settings.
+    P25MonitorConfig      p25;     ///< P25 control channel monitor settings.
+    ThreatDetectionConfig threat;  ///< Threat detection validator flags.
+    std::string           local_ip = "127.0.0.1"; ///< Local IP for IQ fetch callbacks.
 
     /**
      * @brief Parse an XML configuration file and return an AppConfig.
