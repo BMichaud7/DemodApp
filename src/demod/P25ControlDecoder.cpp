@@ -205,7 +205,6 @@ void P25ControlDecoder::decode_tsbk(const uint8_t* p) {
     }
 
     case TsbkOpcode::RFSS_STATUS_BCAST: {
-    {
         uint32_t new_wacn   = ((uint32_t)p[2] << 12) | ((uint32_t)p[3] << 4) | (p[4] >> 4);
         uint16_t new_sys_id = ((uint16_t)(p[4] & 0xFu) << 8) | p[5];
         uint8_t  new_rfss   = p[6];
@@ -229,7 +228,7 @@ void P25ControlDecoder::decode_tsbk(const uint8_t* p) {
         spdlog::debug("P25 RFSS: WACN={:05X} SYS={:03X} RFSS={} SITE={}",
                       site_.wacn, site_.sys_id, site_.rfss_id, site_.site_id);
         break;
-    }
+    }  // RFSS_STATUS_BCAST
 
     case TsbkOpcode::GRP_V_CH_GRANT:
     case TsbkOpcode::GRP_V_CH_GRANT_UPD: {
