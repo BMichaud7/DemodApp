@@ -5,6 +5,12 @@
 #include "demod/PskQamDemod.hpp"
 #include "demod/CwDemod.hpp"
 #include "demod/AfskDemod.hpp"
+#include "demod/DmrDemod.hpp"
+#include "demod/NxdnDemod.hpp"
+#include "demod/DstarDemod.hpp"
+#include "demod/AisDemod.hpp"
+#include "demod/PocsagDemod.hpp"
+#include "demod/AcarsDemod.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <chrono>
@@ -95,6 +101,43 @@ DemodParams DemodRouter::paramsFor(const std::string&       mod,
                 cfg_.engine.digital_duration,
                 DemodClass::Bits, 2, au::hertz(0.0)};
     }
+    // ── Protocol-specific demodulators ────────────────────────────────────────
+    if (mod == "DMR") {
+        return {au::hertz(12'500.0), au::hertz(12'500.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "NXDN") {
+        return {au::hertz(12'500.0), au::hertz(12'500.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "DSTAR" || mod == "D-STAR") {
+        return {au::hertz(12'500.0), au::hertz(6'250.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "AIS") {
+        return {au::hertz(25'000.0), au::hertz(25'000.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "POCSAG") {
+        return {au::hertz(25'000.0), au::hertz(12'500.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "ACARS") {
+        return {au::hertz(25'000.0), au::hertz(8'330.0),
+                cfg_.engine.digital_duration,
+                DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "P25" || mod == "P25_C4FM") {
+        // Voice channel: demodulate as FM_NB (IMBE decoding future)
+        return {au::hertz(12'500.0), au::hertz(6'250.0),
+                cfg_.engine.audio_duration,
+                DemodClass::Audio, 2, au::hertz(2'500.0)};
+    }
     // OFDM / CSS / LFM → raw IQ dump
     return {std::max(bw * 2.0, au::hertz(250'000.0)), bw,
             cfg_.engine.digital_duration,
@@ -160,6 +203,29 @@ bool DemodRouter::route(const std::string&         modulation,
         } else if (modulation == "AFSK") {
             AfskDemod d;
             result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "DMR") {
+            DmrDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "NXDN") {
+            NxdnDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "DSTAR" || modulation == "D-STAR") {
+            DstarDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "AIS") {
+            AisDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "POCSAG") {
+            PocsagDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "ACARS") {
+            AcarsDemod d;
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "P25" || modulation == "P25_C4FM") {
+            // P25 voice: demodulate as FM_NB — audio only (IMBE decode future)
+            FmDemod d(au::hertz(2500.0), cfg_.engine.audio_sample_rate);
+            result = d.process(iq, actual_sr, center_freq, timestamp);
+            result.modulation = "P25";
         } else {
             PskQamDemod d(modulation, symbol_rate);
             result = d.process(iq, actual_sr, center_freq, timestamp);

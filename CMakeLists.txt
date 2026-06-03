@@ -126,6 +126,12 @@ add_library(demod_lib STATIC
     src/demod/PskQamDemod.cpp
     src/demod/CwDemod.cpp
     src/demod/AfskDemod.cpp
+    src/demod/DmrDemod.cpp
+    src/demod/NxdnDemod.cpp
+    src/demod/DstarDemod.cpp
+    src/demod/AisDemod.cpp
+    src/demod/PocsagDemod.cpp
+    src/demod/AcarsDemod.cpp
     src/demod/C4FmDemod.cpp
     src/demod/P25ControlDecoder.cpp
 )
