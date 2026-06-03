@@ -205,11 +205,27 @@ void P25ControlDecoder::decode_tsbk(const uint8_t* p) {
     }
 
     case TsbkOpcode::RFSS_STATUS_BCAST: {
-        site_.wacn   = ((uint32_t)p[2] << 12) | ((uint32_t)p[3] << 4) |
-                       (p[4] >> 4);
-        site_.sys_id = ((uint16_t)(p[4] & 0xFu) << 8) | p[5];
-        site_.rfss_id= p[6];
-        site_.site_id= p[7];
+    {
+        uint32_t new_wacn   = ((uint32_t)p[2] << 12) | ((uint32_t)p[3] << 4) | (p[4] >> 4);
+        uint16_t new_sys_id = ((uint16_t)(p[4] & 0xFu) << 8) | p[5];
+        uint8_t  new_rfss   = p[6];
+        uint8_t  new_site   = p[7];
+
+        // Rogue-site detection: flag if WACN or SYS_ID changes unexpectedly
+        if(site_.wacn != 0 && new_wacn != site_.wacn){
+            char buf[256];
+            snprintf(buf,sizeof(buf),
+                "P25 rogue control channel: WACN changed from %05X to %05X "
+                "(SYS %03X→%03X SITE %u→%u) — possible rogue P25 site or replay attack",
+                site_.wacn, new_wacn, site_.sys_id, new_sys_id, site_.site_id, new_site);
+            spdlog::warn("[ALERT] P25_ROGUE_SITE: {}", buf);
+            rogue_alert_json_ = std::string("{\"type\":\"P25_ROGUE_SITE\","
+                "\"severity\":\"HIGH\",\"details\":\"") + buf + "\"}";
+        }
+        site_.wacn   = new_wacn;
+        site_.sys_id = new_sys_id;
+        site_.rfss_id= new_rfss;
+        site_.site_id= new_site;
         spdlog::debug("P25 RFSS: WACN={:05X} SYS={:03X} RFSS={} SITE={}",
                       site_.wacn, site_.sys_id, site_.rfss_id, site_.site_id);
         break;

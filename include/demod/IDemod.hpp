@@ -44,6 +44,11 @@ struct DemodResult {
     std::vector<float>               audio;  ///< PCM float32, typically 48 kHz mono.
     std::vector<uint8_t>             bits;   ///< Packed bytes, MSB-first.
     std::vector<std::complex<float>> raw_iq; ///< Unprocessed IQ samples.
+
+    // Optional threat alert detected during demodulation/validation.
+    // Non-empty string = alert JSON to be persisted by the upstream consumer.
+    // Format: {"type":"ADSB_SPOOFING","severity":"HIGH","details":"..."}
+    std::string alert_json;
 };
 
 /**

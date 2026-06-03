@@ -68,6 +68,10 @@ private:
     std::unordered_set<uint32_t>       tg_whitelist_;
     std::unordered_map<uint8_t, ChannelId> channel_map_;
     SiteInfo       site_{};
+    std::string    rogue_alert_json_; ///< Set when WACN/site changes unexpectedly.
+public:
+    /// Drain any pending alert JSON (empty string = no alert). Clears on read.
+    std::string pop_alert() { return std::exchange(rogue_alert_json_, {}); }
 
     // Bit buffer for frame sync hunting
     std::vector<uint8_t> bit_buf_;

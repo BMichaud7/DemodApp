@@ -72,6 +72,40 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
     }
     spdlog::debug("AisDemod: {} raw bits → {} bytes after NRZI/HDLC",
                   raw_bits.size(), r.bits.size());
+
+    // ── AIS spoofing heuristics ───────────────────────────────────────────
+    // AIS message type 1/2/3 (position report): minimum 28 bytes
+    if (r.bits.size() >= 28) {
+        const auto& b = r.bits;
+        int msg_type = (b[0] >> 2) & 0x3F;
+        if (msg_type >= 1 && msg_type <= 3) {
+            // MMSI: bits 8-37 (30 bits)
+            uint32_t mmsi = 0;
+            for (int i=8;i<38;++i) mmsi = (mmsi<<1)|((decoded.size()>i)?(decoded[i]&1):0);
+            // SOG (speed over ground): bits 50-59, 1/10 knot units
+            uint32_t sog_raw = 0;
+            for (int i=50;i<60&&i<(int)decoded.size();++i)
+                sog_raw = (sog_raw<<1)|(decoded[i]&1);
+            double sog_kt = sog_raw / 10.0;
+
+            // Vessels >102.2 knots are flagged as "not available" in the spec.
+            // Anything above 50 knots for a surface vessel is deeply suspicious.
+            if (sog_kt > 50.0 && sog_kt < 102.2) {
+                r.alert_json = "{\"type\":\"AIS_SPOOFING\",\"severity\":\"HIGH\","
+                    "\"details\":\"MMSI " + std::to_string(mmsi) +
+                    " impossible SOG " + std::to_string((int)sog_kt) +
+                    " knots (surface vessel max ~50 kt)\"}";
+                spdlog::warn("[ALERT] AIS spoofing: MMSI={} SOG={:.1f} kt", mmsi, sog_kt);
+            }
+            // MMSI sanity: must be 9 digits, 100000000–999999999
+            if (mmsi < 100000000 || mmsi > 999999999) {
+                r.alert_json = "{\"type\":\"AIS_SPOOFING\",\"severity\":\"MEDIUM\","
+                    "\"details\":\"Invalid MMSI " + std::to_string(mmsi) +
+                    " (not 9 digits)\"}";
+                spdlog::warn("[ALERT] AIS spoofing: invalid MMSI={}", mmsi);
+            }
+        }
+    }
     return r;
 }
 

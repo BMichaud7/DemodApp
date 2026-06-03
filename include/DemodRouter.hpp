@@ -15,6 +15,8 @@ namespace demod {
 
 /// @brief Callback invoked with a completed DemodResult.
 using ResultCallback = std::function<void(const DemodResult&)>;
+/// @brief Callback invoked when a demodulator detects a threat alert.
+using AlertCallback  = std::function<void(const std::string& alert_json, double freq_hz)>;
 
 /**
  * @class DemodRouter
@@ -37,7 +39,8 @@ public:
      * @param on_result Callback invoked once per completed demodulation.
      */
     DemodRouter(const AppConfig& cfg, IqFetcher& fetcher,
-                ResultCallback on_result);
+                ResultCallback on_result,
+                AlertCallback  on_alert = {});
 
     /**
      * @brief Route a detected signal to the correct demodulator.
@@ -67,9 +70,10 @@ public:
                const std::string&         stream_id = "");
 
 private:
-    AppConfig      cfg_;       ///< Application configuration.
-    IqFetcher&     fetcher_;   ///< Shared IQ fetcher.
-    ResultCallback on_result_; ///< Result callback.
+    AppConfig      cfg_;        ///< Application configuration.
+    IqFetcher&     fetcher_;    ///< Shared IQ fetcher.
+    ResultCallback on_result_;  ///< Result callback.
+    AlertCallback  on_alert_;   ///< Optional alert callback.
 
     /**
      * @brief Determine DemodParams for a given modulation.

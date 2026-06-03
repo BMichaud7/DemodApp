@@ -63,6 +63,38 @@ DemodResult EasSameDemod::process(const std::vector<std::complex<float>>& iq,
         std::string header=raw.substr(pos,std::min((size_t)256,raw.size()-pos));
         spdlog::info("EAS/SAME: {}", header);
         r.bits.assign(header.begin(),header.end());
+
+        // ── EAS spoofing heuristics ───────────────────────────────────────
+        // ZCZC-ORG-EVT-PSSCCC+TTTT-JJJHHMM-LLLLLLLL-
+        // Valid originators: PEP, EAS, CIV, WXR, NWS, EAN
+        static const std::array<const char*,6> VALID_ORG = {"PEP","EAS","CIV","WXR","NWS","EAN"};
+        // High-severity events that would be unusual without a real emergency
+        static const std::array<const char*,6> RARE_EVENTS = {"EAN","NPT","EVI","CDW","VOW","EQW"};
+
+        auto dash1 = header.find('-', 5);
+        auto dash2 = (dash1!=std::string::npos) ? header.find('-', dash1+1) : std::string::npos;
+        if(dash1!=std::string::npos && dash2!=std::string::npos){
+            std::string org = header.substr(5, dash1-5);
+            std::string evt = header.substr(dash1+1, dash2-dash1-1);
+            bool valid_org = false;
+            for(auto& o:VALID_ORG) if(org==o){valid_org=true;break;}
+            if(!valid_org){
+                r.alert_json="{\"type\":\"EAS_SPOOFING\",\"severity\":\"HIGH\","
+                    "\"details\":\"Invalid EAS originator code '"+org+
+                    "' in alert: "+header.substr(0,80)+"\"}";
+                spdlog::warn("[ALERT] EAS spoofing: invalid originator '{}'", org);
+            }
+            // Flag rare/national-level events for manual review
+            for(auto& e:RARE_EVENTS){
+                if(evt==e){
+                    r.alert_json="{\"type\":\"EAS_SPOOFING\",\"severity\":\"MEDIUM\","
+                        "\"details\":\"Rare EAS event code '"+evt+
+                        "' — verify authenticity: "+header.substr(0,80)+"\"}";
+                    spdlog::warn("[ALERT] EAS suspicious rare event '{}'", evt);
+                    break;
+                }
+            }
+        }
         return r;
     }
     r.bits=bytes;

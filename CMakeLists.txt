@@ -145,6 +145,7 @@ add_library(demod_lib STATIC
     src/demod/FlexDemod.cpp
     src/demod/C4FmDemod.cpp
     src/demod/P25ControlDecoder.cpp
+    src/AlertPublisher.cpp
 )
 target_include_directories(demod_lib PUBLIC include)
 target_link_libraries(demod_lib PUBLIC

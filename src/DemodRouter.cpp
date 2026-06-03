@@ -39,8 +39,9 @@ static std::string genId() {
 }
 
 DemodRouter::DemodRouter(const AppConfig& cfg, IqFetcher& fetcher,
-                         ResultCallback on_result)
-    : cfg_(cfg), fetcher_(fetcher), on_result_(std::move(on_result)) {}
+                         ResultCallback on_result, AlertCallback on_alert)
+    : cfg_(cfg), fetcher_(fetcher), on_result_(std::move(on_result)),
+      on_alert_(std::move(on_alert)) {}
 
 DemodParams DemodRouter::paramsFor(const std::string&       mod,
                                    au::QuantityD<au::Hertz> bandwidth,
@@ -315,6 +316,8 @@ bool DemodRouter::route(const std::string&         modulation,
     }
 
     result.stream_id = stream_id;
+    if (!result.alert_json.empty() && on_alert_)
+        on_alert_(result.alert_json, center_freq.in(au::hertz));
     on_result_(result);
     return true;
 }

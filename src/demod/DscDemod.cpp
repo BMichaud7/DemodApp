@@ -65,9 +65,34 @@ DemodResult DscDemod::process(const std::vector<std::complex<float>>& iq,
                 mmsi+=std::to_string((bytes[i+5+m]>>4)&0xF);
                 mmsi+=std::to_string( bytes[i+5+m]     &0xF);
             }
-            std::string msg=std::string(dsc_category(cat))+" MMSI:"+mmsi.substr(0,9);
+            std::string cat_name = dsc_category(cat);
+            std::string mmsi9 = mmsi.substr(0,9);
+            std::string msg = cat_name + " MMSI:" + mmsi9;
             spdlog::info("DSC: {}",msg);
             r.bits.assign(msg.begin(),msg.end());
+
+            // ── DSC spoofing heuristics ───────────────────────────────────
+            // Distress MMSI spoofing: fake Mayday is a serious crime (ITU Radio Regs Art.32)
+            if(cat==112){  // Distress category
+                // MMSI first 3 digits = MID (Maritime Identification Digits, 200-799)
+                int mid = 0;
+                if(mmsi9.size()>=3) mid=(mmsi9[0]-'0')*100+(mmsi9[1]-'0')*10+(mmsi9[2]-'0');
+                bool valid_mid = (mid>=200 && mid<=799);
+                // Coast station MMSIs start with 00, ship MMSIs never start with 0
+                bool valid_vessel = !mmsi9.empty() && mmsi9[0]!='0';
+                if(!valid_mid || !valid_vessel){
+                    r.alert_json="{\"type\":\"DSC_SPOOFING\",\"severity\":\"CRITICAL\","
+                        "\"details\":\"DSC Distress call with invalid/suspicious MMSI "+mmsi9+
+                        " — possible fake Mayday (ITU Art.32 violation)\"}";
+                    spdlog::warn("[ALERT] DSC spoofing: suspicious Distress MMSI={}", mmsi9);
+                } else {
+                    // Even with valid MMSI flag all distress calls for review
+                    r.alert_json="{\"type\":\"DSC_SPOOFING\",\"severity\":\"MEDIUM\","
+                        "\"details\":\"DSC Distress received from MMSI "+mmsi9+
+                        " — log for verification\"}";
+                    spdlog::warn("[ALERT] DSC Distress: MMSI={} — log for review", mmsi9);
+                }
+            }
             return r;
         }
     }
