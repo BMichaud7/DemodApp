@@ -24,21 +24,17 @@ DemodResult Vdl2Demod::process(const std::vector<std::complex<float>>& iq,
 
     float sps=static_cast<float>(sr.in(au::hertz)/VDL2_SYM_RATE);
     modemcf mod=modemcf_create(LIQUID_MODEM_DPSK8);
-    symsync_cccf sync=symsync_cccf_create_rnyquist(
-        LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.6f,32);
-    symsync_cccf_set_lf_bw(sync,0.01f);
 
+    // Downsample to ~1 sample/symbol before demodulation
     std::vector<uint8_t> bits;
-    std::complex<float> out[4]; unsigned n;
-    std::vector<std::complex<float>> block(iq.begin(),iq.end());
-    symsync_cccf_execute(sync,block.data(),(unsigned)block.size(),out,&n);
-    for(unsigned i=0;i<n;++i){
-        unsigned sym=0; modemcf_demodulate(mod,out[i],&sym);
+    unsigned step = std::max(1u, static_cast<unsigned>(std::round(sps)));
+    for(size_t i=0; i<iq.size(); i+=step){
+        unsigned sym=0; modemcf_demodulate(mod,iq[i],&sym);
         bits.push_back((sym>>2)&1);
         bits.push_back((sym>>1)&1);
         bits.push_back( sym    &1);
     }
-    modemcf_destroy(mod); symsync_cccf_destroy(sync);
+    modemcf_destroy(mod);
 
     // VDL2 uses AVLC framing (similar to HDLC): 0x7E flags
     std::vector<uint8_t> bytes;

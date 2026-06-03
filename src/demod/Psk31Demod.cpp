@@ -53,22 +53,17 @@ DemodResult Psk31Demod::process(const std::vector<std::complex<float>>& iq,
 
     float sps=static_cast<float>(sr.in(au::hertz)/PSK31_BAUD);
     modemcf mod=modemcf_create(LIQUID_MODEM_BPSK);
-    symsync_cccf sync=symsync_cccf_create_rnyquist(
-        LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.2f,32);
-    symsync_cccf_set_lf_bw(sync,0.005f);
 
+    // Downsample to ~1 sample/symbol; PSK31 baud is slow so this is sufficient
     std::vector<uint8_t> bits;
-    std::complex<float> out[4]; unsigned n;
-    std::vector<std::complex<float>> block(iq.begin(),iq.end());
-    symsync_cccf_execute(sync,block.data(),(unsigned)block.size(),out,&n);
-    // Differential decode: XOR with previous symbol
+    unsigned step = std::max(1u, static_cast<unsigned>(std::round(sps)));
     unsigned prev=0;
-    for(unsigned i=0;i<n;++i){
-        unsigned sym=0; modemcf_demodulate(mod,out[i],&sym);
+    for(size_t i=0; i<iq.size(); i+=step){
+        unsigned sym=0; modemcf_demodulate(mod,iq[i],&sym);
         bits.push_back((sym^prev)&1);
         prev=sym;
     }
-    modemcf_destroy(mod); symsync_cccf_destroy(sync);
+    modemcf_destroy(mod);
 
     // Varicode decode: two consecutive 0s = character boundary
     std::string text;
