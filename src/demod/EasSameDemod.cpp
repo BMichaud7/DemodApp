@@ -1,0 +1,72 @@
+#include "demod/EasSameDemod.hpp"
+#include <liquid/liquid.h>
+#include <cmath>
+#include <spdlog/spdlog.h>
+
+namespace demod {
+
+// EAS/SAME: AFSK 520 baud, mark=2083 Hz, space=1563 Hz
+// Preamble: 16×0xAB, then "ZCZC-" header
+static constexpr double EAS_BAUD  = 520.833;
+static constexpr double EAS_MARK  = 2083.3;
+static constexpr double EAS_SPACE = 1562.5;
+
+DemodResult EasSameDemod::process(const std::vector<std::complex<float>>& iq,
+                                   au::QuantityD<au::Hertz>   sr,
+                                   au::QuantityD<au::Hertz>   center_freq,
+                                   au::QuantityD<au::Seconds> timestamp) {
+    DemodResult r;
+    r.type        = DemodClass::Bits;
+    r.modulation  = "EAS_SAME";
+    r.center_freq = center_freq;
+    r.sample_rate = au::hertz(EAS_BAUD);
+    r.timestamp_ms= static_cast<int64_t>(timestamp.in(au::seconds)*1000);
+    r.duration    = sr.in(au::hertz)>0?au::seconds(iq.size()/sr.in(au::hertz)):au::seconds(0.0);
+    if (iq.empty()) return r;
+
+    double sr_hz = sr.in(au::hertz);
+    // AM demodulate → audio
+    std::vector<float> audio;
+    audio.reserve(iq.size());
+    ampmodem am = ampmodem_create(0.85f,LIQUID_AMPMODEM_DSB,0);
+    for(const auto& s:iq){float d;ampmodem_demodulate(am,s,&d);audio.push_back(d);}
+    ampmodem_destroy(am);
+
+    // Discriminate mark vs space using Goertzel on each bit period
+    int sps = std::max(1,static_cast<int>(sr_hz/EAS_BAUD));
+    std::vector<uint8_t> bits;
+    for(size_t i=0;i+sps<=(size_t)audio.size();i+=sps) {
+        double em=0,es=0;
+        const float* buf=audio.data()+i;
+        double coef_m=2*std::cos(2*M_PI*EAS_MARK/sr_hz);
+        double coef_s=2*std::cos(2*M_PI*EAS_SPACE/sr_hz);
+        double s1m=0,s2m=0,s1s=0,s2s=0;
+        for(int k=0;k<sps;++k){
+            double sm=buf[k]+coef_m*s1m-s2m; s2m=s1m; s1m=sm;
+            double ss=buf[k]+coef_s*s1s-s2s; s2s=s1s; s1s=ss;
+        }
+        em=s1m*s1m+s2m*s2m-coef_m*s1m*s2m;
+        es=s1s*s1s+s2s*s2s-coef_s*s1s*s2s;
+        bits.push_back(em>es?1:0);  // mark=1, space=0
+    }
+
+    // Find ZCZC header
+    std::vector<uint8_t> bytes;
+    for(size_t i=0;i+8<=(size_t)bits.size();i+=8){
+        uint8_t byte=0;
+        for(int b=0;b<8;++b) byte|=static_cast<uint8_t>(bits[i+b]<<b);
+        bytes.push_back(byte);
+    }
+    std::string raw(bytes.begin(),bytes.end());
+    auto pos=raw.find("ZCZC");
+    if(pos!=std::string::npos){
+        std::string header=raw.substr(pos,std::min((size_t)256,raw.size()-pos));
+        spdlog::info("EAS/SAME: {}", header);
+        r.bits.assign(header.begin(),header.end());
+        return r;
+    }
+    r.bits=bytes;
+    return r;
+}
+
+} // namespace demod

@@ -11,6 +11,17 @@
 #include "demod/AisDemod.hpp"
 #include "demod/PocsagDemod.hpp"
 #include "demod/AcarsDemod.hpp"
+#include "demod/FlexDemod.hpp"
+#include "demod/Mdc1200Demod.hpp"
+#include "demod/DtmfDemod.hpp"
+#include "demod/EasSameDemod.hpp"
+#include "demod/RttyDemod.hpp"
+#include "demod/P25Phase2Demod.hpp"
+#include "demod/AdsbDemod.hpp"
+#include "demod/DscDemod.hpp"
+#include "demod/NavtexDemod.hpp"
+#include "demod/Vdl2Demod.hpp"
+#include "demod/Psk31Demod.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <chrono>
@@ -133,10 +144,51 @@ DemodParams DemodRouter::paramsFor(const std::string&       mod,
                 DemodClass::Bits, 2, au::hertz(0.0)};
     }
     if (mod == "P25" || mod == "P25_C4FM") {
-        // Voice channel: demodulate as FM_NB (IMBE decoding future)
         return {au::hertz(12'500.0), au::hertz(6'250.0),
-                cfg_.engine.audio_duration,
-                DemodClass::Audio, 2, au::hertz(2'500.0)};
+                cfg_.engine.audio_duration, DemodClass::Audio, 2, au::hertz(2'500.0)};
+    }
+    if (mod == "P25_PHASE2") {
+        return {au::hertz(12'500.0), au::hertz(6'250.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "FLEX") {
+        return {au::hertz(25'000.0), au::hertz(12'500.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "MDC-1200" || mod == "MDC1200") {
+        return {au::hertz(12'500.0), au::hertz(6'250.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "DTMF") {
+        return {bw * 2.0, bw, cfg_.engine.audio_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "EAS" || mod == "EAS_SAME" || mod == "SAME") {
+        return {au::hertz(25'000.0), au::hertz(8'000.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "RTTY") {
+        return {au::hertz(1'000.0), au::hertz(500.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "ADS_B" || mod == "ADSB") {
+        return {au::hertz(2'000'000.0), au::hertz(1'500'000.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "DSC") {
+        return {au::hertz(6'250.0), au::hertz(3'000.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "NAVTEX") {
+        return {au::hertz(1'000.0), au::hertz(500.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "VDL2" || mod == "VDL_MODE2") {
+        return {au::hertz(25'000.0), au::hertz(12'500.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
+    }
+    if (mod == "PSK31" || mod == "PSK63") {
+        return {au::hertz(500.0), au::hertz(100.0),
+                cfg_.engine.digital_duration, DemodClass::Bits, 2, au::hertz(0.0)};
     }
     // OFDM / CSS / LFM → raw IQ dump
     return {std::max(bw * 2.0, au::hertz(250'000.0)), bw,
@@ -222,10 +274,31 @@ bool DemodRouter::route(const std::string&         modulation,
             AcarsDemod d;
             result = d.process(iq, actual_sr, center_freq, timestamp);
         } else if (modulation == "P25" || modulation == "P25_C4FM") {
-            // P25 voice: demodulate as FM_NB — audio only (IMBE decode future)
             FmDemod d(au::hertz(2500.0), cfg_.engine.audio_sample_rate);
             result = d.process(iq, actual_sr, center_freq, timestamp);
             result.modulation = "P25";
+        } else if (modulation == "P25_PHASE2") {
+            P25Phase2Demod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "FLEX") {
+            FlexDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "MDC-1200" || modulation == "MDC1200") {
+            Mdc1200Demod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "DTMF") {
+            DtmfDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "EAS" || modulation == "EAS_SAME" || modulation == "SAME") {
+            EasSameDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "RTTY") {
+            RttyDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "ADS_B" || modulation == "ADSB") {
+            AdsbDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "DSC") {
+            DscDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "NAVTEX") {
+            NavtexDemod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "VDL2" || modulation == "VDL_MODE2") {
+            Vdl2Demod d; result = d.process(iq, actual_sr, center_freq, timestamp);
+        } else if (modulation == "PSK31" || modulation == "PSK63") {
+            Psk31Demod d; result = d.process(iq, actual_sr, center_freq, timestamp);
         } else {
             PskQamDemod d(modulation, symbol_rate);
             result = d.process(iq, actual_sr, center_freq, timestamp);

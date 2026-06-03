@@ -132,6 +132,17 @@ add_library(demod_lib STATIC
     src/demod/AisDemod.cpp
     src/demod/PocsagDemod.cpp
     src/demod/AcarsDemod.cpp
+    src/demod/Psk31Demod.cpp
+    src/demod/Vdl2Demod.cpp
+    src/demod/NavtexDemod.cpp
+    src/demod/DscDemod.cpp
+    src/demod/AdsbDemod.cpp
+    src/demod/P25Phase2Demod.cpp
+    src/demod/RttyDemod.cpp
+    src/demod/EasSameDemod.cpp
+    src/demod/DtmfDemod.cpp
+    src/demod/Mdc1200Demod.cpp
+    src/demod/FlexDemod.cpp
     src/demod/C4FmDemod.cpp
     src/demod/P25ControlDecoder.cpp
 )
