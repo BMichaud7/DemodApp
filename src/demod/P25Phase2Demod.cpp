@@ -25,21 +25,17 @@ DemodResult P25Phase2Demod::process(const std::vector<std::complex<float>>& iq,
     float sps=static_cast<float>(sr.in(au::hertz)/P2_SYM_RATE);
     // π/4-DQPSK: differential QPSK with π/4 rotation per symbol
     modemcf mod=modemcf_create(LIQUID_MODEM_DPSK4);
-    symsync_cccf sync=symsync_cccf_create_rnyquist(
-        LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.2f,32);
-    symsync_cccf_set_lf_bw(sync,0.01f);
 
+    // Downsample to ~1 sample/symbol (symsync_cccf not available in liquid-dsp 1.4)
     std::vector<uint8_t> bits;
-    std::complex<float> sym_out[4]; unsigned n;
-    std::vector<std::complex<float>> in_block(iq.begin(),iq.end());
-    symsync_cccf_execute(sync,in_block.data(),(unsigned)in_block.size(),sym_out,&n);
-    for(unsigned i=0;i<n;++i){
+    unsigned step=std::max(1u,static_cast<unsigned>(std::round(sps)));
+    for(size_t i=0;i<iq.size();i+=step){
         unsigned sym_idx=0;
-        modemcf_demodulate(mod,sym_out[i],&sym_idx);
+        modemcf_demodulate(mod,iq[i],&sym_idx);
         bits.push_back((sym_idx>>1)&1);
         bits.push_back( sym_idx    &1);
     }
-    modemcf_destroy(mod);symsync_cccf_destroy(sync);
+    modemcf_destroy(mod);
 
     spdlog::debug("P25Ph2: {} symbols",bits.size()/2);
     r.bits.reserve((bits.size()+7)/8);
