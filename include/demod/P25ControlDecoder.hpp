@@ -11,10 +11,12 @@
 #pragma once
 #include "P25Types.hpp"
 #include <functional>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdint>
+#include <string>
 
 namespace demod::p25 {
 
@@ -49,6 +51,9 @@ public:
         tg_whitelist_ = std::move(tg_ids);
     }
 
+    /// Drain any pending rogue-site alert JSON (empty = no alert). Clears on read.
+    std::string pop_alert() { return std::exchange(rogue_alert_json_, {}); }
+
 private:
     // Frame synchroniser
     bool try_sync(uint64_t& shift_reg) const;
@@ -69,9 +74,6 @@ private:
     std::unordered_map<uint8_t, ChannelId> channel_map_;
     SiteInfo       site_{};
     std::string    rogue_alert_json_; ///< Set when WACN/site changes unexpectedly.
-public:
-    /// Drain any pending alert JSON (empty string = no alert). Clears on read.
-    std::string pop_alert() { return std::exchange(rogue_alert_json_, {}); }
 
     // Bit buffer for frame sync hunting
     std::vector<uint8_t> bit_buf_;
