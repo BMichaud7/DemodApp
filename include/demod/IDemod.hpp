@@ -45,9 +45,15 @@ struct DemodResult {
     std::vector<uint8_t>             bits;   ///< Packed bytes, MSB-first.
     std::vector<std::complex<float>> raw_iq; ///< Unprocessed IQ samples.
 
-    // Optional threat alert detected during demodulation/validation.
-    // Non-empty string = alert JSON to be persisted by the upstream consumer.
-    // Format: {"type":"ADSB_SPOOFING","severity":"HIGH","details":"..."}
+    /// Optional threat alert JSON populated by content-layer validators.
+    ///
+    /// Non-empty when the demodulator detects an anomaly (impossible physics,
+    /// invalid protocol fields, etc.).  Format:
+    /// @code{.json}
+    /// {"type":"ADSB_SPOOFING","severity":"HIGH","details":"ICAO AB1234 GS=2200 kt"}
+    /// @endcode
+    /// DemodRouter checks ThreatDetectionConfig flags before forwarding.
+    /// Cleared by DemodRouter if the corresponding validator flag is disabled.
     std::string alert_json;
 };
 

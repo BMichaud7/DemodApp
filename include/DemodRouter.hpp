@@ -38,6 +38,15 @@ public:
      * @param fetcher   Reference to the shared IqFetcher instance.
      * @param on_result Callback invoked once per completed demodulation.
      */
+    /**
+     * @brief Construct a DemodRouter.
+     * @param cfg       Application configuration (engine, broker, threat flags).
+     * @param fetcher   Reference to the shared IqFetcher instance.
+     * @param on_result Callback invoked once per completed demodulation.
+     * @param on_alert  Optional callback invoked when a validator sets
+     *                  DemodResult::alert_json and ThreatDetectionConfig permits it.
+     *                  Receives the raw JSON string and the signal's centre frequency in Hz.
+     */
     DemodRouter(const AppConfig& cfg, IqFetcher& fetcher,
                 ResultCallback on_result,
                 AlertCallback  on_alert = {});
