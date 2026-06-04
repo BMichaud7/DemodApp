@@ -1,3 +1,15 @@
+/*
+========================================================================
+Project: OpenRFStack
+Author:  Brendan Michaud
+Year:    2026
+Part of OpenRFStack (https://github.com/OpenRFStack)
+
+Licensed under the Personal Use License.
+Do not use for commercial, organizational, or military purposes.
+Contact author for permission: https://github.com/OpenRFStack
+========================================================================
+*/
 /**
  * @file Mdc1200Demod.hpp
  * @brief MDC-1200 Motorola PTT ID protocol (2-FSK 1200 baud). Radio unit ID, emergency, status.
