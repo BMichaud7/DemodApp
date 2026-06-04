@@ -113,3 +113,11 @@ DemodResult DscDemod::process(const std::vector<std::complex<float>>& iq,
 }
 
 } // namespace demod
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

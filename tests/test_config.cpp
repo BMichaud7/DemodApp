@@ -33,3 +33,11 @@ TEST(AppConfig, ParsesXmlDefaults) {
 
     std::remove(path);
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

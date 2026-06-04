@@ -261,3 +261,11 @@ TEST(CrossModTest, PocsagDemodOnSilenceProducesRawBytes) {
     // Silence → no sync found → raw bits (possibly empty or few bytes)
     EXPECT_EQ(r.type, DemodClass::Bits);
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

@@ -36,3 +36,11 @@ TEST(CwDemod, EmptyInputReturnsEmpty) {
     EXPECT_EQ(r.type, DemodClass::Bits);
     EXPECT_TRUE(r.bits.empty());
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

@@ -207,3 +207,11 @@ void P25Monitor::publish_grant(const p25::ChannelGrant& grant) {
 }
 
 } // namespace demod
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

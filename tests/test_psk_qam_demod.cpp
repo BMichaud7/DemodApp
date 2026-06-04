@@ -25,3 +25,11 @@ TEST(PskQamDemod, BpskProducesBits) {
     EXPECT_EQ(r.type, DemodClass::Bits);
     EXPECT_GT(r.bits.size(), 0u);
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

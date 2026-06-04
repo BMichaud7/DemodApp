@@ -307,3 +307,11 @@ double P25ControlDecoder::resolve_freq(uint8_t iden, uint16_t channel_num) const
 }
 
 } // namespace demod::p25
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

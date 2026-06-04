@@ -37,3 +37,11 @@ TEST(FmDemod, NbfmProducesAudio) {
     EXPECT_EQ(r.type, DemodClass::Audio);
     EXPECT_GT(r.audio.size(), 0u);
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

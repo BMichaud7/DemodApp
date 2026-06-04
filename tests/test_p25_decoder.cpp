@@ -246,3 +246,11 @@ TEST(P25WhitelistTest, WhitelistCanBeUpdated) {
     // Should not throw
     dec.set_whitelist({});  // back to all-pass
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

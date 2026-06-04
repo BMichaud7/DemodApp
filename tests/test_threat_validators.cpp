@@ -473,3 +473,11 @@ TEST(DemodResultAlert, MultipleDemodulatorsClear) {
     EXPECT_FALSE(r1.alert_json.empty());
     EXPECT_TRUE(r2.alert_json.empty());
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

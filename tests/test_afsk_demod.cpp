@@ -40,3 +40,11 @@ TEST(AfskDemod, AlternatingSymbolsProducesBytes) {
     EXPECT_GE(r.bits.size(), 3u);
     EXPECT_LE(r.bits.size(), 5u);
 }
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/

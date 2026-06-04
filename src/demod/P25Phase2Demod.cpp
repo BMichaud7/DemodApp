@@ -57,3 +57,11 @@ DemodResult P25Phase2Demod::process(const std::vector<std::complex<float>>& iq,
 }
 
 } // namespace demod
+
+/*
+========================================================================
+End of file — OpenRFStack
+Subject to Personal Use License
+https://github.com/OpenRFStack
+========================================================================
+*/
