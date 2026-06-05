@@ -16,6 +16,7 @@ Contact author for permission: https://github.com/OpenRFStack
  */
 #pragma once
 #include <string>
+#include <vector>
 #include <cstdint>
 #include "au/units/hertz.hh"
 #include "au/units/seconds.hh"
