@@ -62,6 +62,8 @@ jobs:
           fi
           echo "Found binary: $BIN"
           mkdir -p rpm_out
+          LIQUID_LIBS=$(find /usr/local/lib /usr/lib64 /usr/lib -name 'libliquid*.so*' ! -name '*.a' 2>/dev/null)
+          LIQUID_ARGS=(); for lib in $LIQUID_LIBS; do LIQUID_ARGS+=("${lib}=/usr/lib64/$(basename ${lib})"); done
           fpm -s dir -t rpm \
             -n sdr-demod \
             -v "${VERSION}" \
@@ -71,7 +73,8 @@ jobs:
             --url "https://github.com/OpenRFStack/DemodApp" \
             --license "Proprietary" \
             --package rpm_out/ \
-            "${BIN}=/usr/bin/sdr_demod"
+            "${BIN}=/usr/bin/sdr_demod" \
+            "${LIQUID_ARGS[@]}"
           ls -lh rpm_out/
 
       - name: Upload to GitHub Release
