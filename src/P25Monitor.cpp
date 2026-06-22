@@ -18,6 +18,7 @@ Contact author for permission: https://github.com/OpenRFStack
 
 #include <proton/connection.hpp>
 #include <proton/connection_options.hpp>
+#include <proton/reconnect_options.hpp>
 #include <proton/receiver_options.hpp>
 #include <proton/source_options.hpp>
 #include <proton/sender.hpp>
@@ -43,6 +44,14 @@ public:
             copts.user(mon_.cfg_.broker.username);
         if (!mon_.cfg_.broker.password.empty())
             copts.password(mon_.cfg_.broker.password);
+        // Without this, a failed initial connection (Artemis not up yet) is
+        // permanent -- the P25 control-channel monitor would silently never
+        // receive rf.detections again. Same fix as AlertPublisher in this repo.
+        proton::reconnect_options ropts;
+        ropts.delay(proton::duration(2000));
+        ropts.max_delay(proton::duration(30000));
+        ropts.max_attempts(0);
+        copts.reconnect(ropts);
         c.connect(mon_.cfg_.broker.url, copts);
     }
 
