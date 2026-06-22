@@ -31,7 +31,15 @@ void AlertPublisher::start() {
 
 void AlertPublisher::stop() {
     stopping_ = true;
-    if (wq_) wq_->add([this]{ sender_.connection().close(); });
+    if (wq_)
+        wq_->add([this]{ sender_.connection().close(); });
+    else
+        // Connection never reached on_sender_open (e.g. still mid-reconnect
+        // after Artemis wasn't up at start()), so there's no work queue to
+        // post a close through -- stop the reactor directly so thread_.join()
+        // below can't block forever now that reconnect_options below retries
+        // indefinitely. Matches AcquisitionApp::AmqpPublisher / TaskAmqpChannel.
+        container_.stop();
     if (thread_.joinable()) thread_.join();
 }
 
@@ -58,6 +66,17 @@ void AlertPublisher::on_container_start(proton::container& c) {
     } else {
         opts.sasl_allowed_mechs("ANONYMOUS");
     }
+    // Without this, a failed initial connection (Artemis not up yet at
+    // process start, the common case) is permanent: proton tears the
+    // container down, wq_ never gets set, and publish() silently no-ops
+    // forever -- a threat-detection alert pipeline that looks enabled but
+    // never actually sends anything. Same fix as GpsApp::AmqpPublisher and
+    // AcquisitionApp::AmqpPublisher/TaskAmqpChannel, ported here.
+    proton::reconnect_options ropts;
+    ropts.delay(proton::duration(2000));
+    ropts.max_delay(proton::duration(30000));
+    ropts.max_attempts(0);
+    opts.reconnect(ropts);
     c.connect(url_, opts);
 }
 

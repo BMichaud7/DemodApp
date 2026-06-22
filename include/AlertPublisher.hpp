@@ -34,6 +34,7 @@ Contact author for permission: https://github.com/OpenRFStack
  */
 #include <proton/container.hpp>
 #include <proton/messaging_handler.hpp>
+#include <proton/reconnect_options.hpp>
 #include <proton/sender.hpp>
 #include <proton/work_queue.hpp>
 #include <atomic>
