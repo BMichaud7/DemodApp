@@ -60,7 +60,7 @@ AppConfig AppConfig::fromXml(const std::string& path) {
         cfg.broker.username       = optText(b, "username");
         cfg.broker.password       = optText(b, "password");
         cfg.broker.demod_request_queue = optText(b, "demod_request_queue", "rf.demod.request");
-        cfg.broker.task_queue     = optText(b, "task_request_queue", "sdr.tasks");
+        cfg.broker.task_queue     = optText(b, "task_request_queue", "sdr.task.request");
         cfg.broker.demod_topic    = optText(b, "demod_topic", "rf.demod");
     }
 

@@ -43,7 +43,7 @@ All frequency, bandwidth, and symbol-rate parameters use [Au units](https://gith
 |---|---|---|
 | Subscribe | `rf.demod.request` (queue) | `DEMOD_REQUEST` JSON |
 | Publish | `rf.demod` (topic) | `DEMOD_RESULT` JSON |
-| IQ fetch | `sdr.tasks` (queue) | SdrTaskApi `NARROWBAND` task |
+| IQ fetch | `sdr.task.request` (queue) | SdrTaskApi `NARROWBAND` task |
 
 ## Configuration
 
@@ -55,7 +55,7 @@ All frequency, bandwidth, and symbol-rate parameters use [Au units](https://gith
     <password>sdr_hw_test</password>
     <demod_request_queue>rf.demod.request</demod_request_queue>
     <demod_topic>rf.demod</demod_topic>
-    <task_queue>sdr.tasks</task_queue>
+    <task_request_queue>sdr.task.request</task_request_queue>
   </broker>
   <engine>
     <rank>4</rank>                          <!-- IQ fetch priority (higher = higher priority) -->

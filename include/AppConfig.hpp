@@ -31,7 +31,7 @@ struct BrokerConfig {
     std::string username;                                       ///< Optional username.
     std::string password;                                       ///< Optional password.
     std::string demod_request_queue  = "rf.demod.request";     ///< Queue for inbound DEMOD_REQUEST messages.
-    std::string task_queue           = "sdr.tasks";             ///< Queue for IQ task requests.
+    std::string task_queue           = "sdr.task.request";      ///< Queue for IQ task requests (must match SdrResourceManager's request_queue).
     std::string demod_topic          = "rf.demod";              ///< Topic for demod output.
 };
 
