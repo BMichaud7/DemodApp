@@ -113,6 +113,7 @@ private:
     struct StreamSession {
         PendingDemod      params;
         std::atomic<bool> active{true};
+        std::atomic<bool> done{false};
     };
     using StreamPtr = std::shared_ptr<StreamSession>;
 
@@ -138,9 +139,9 @@ private:
     std::mutex streams_mu_;
     /// Active sessions keyed by stream_id.
     std::unordered_map<std::string, StreamPtr> streams_;
-    /// All stream threads — joined in stop().
+    /// All stream threads — pruned in startStream(), joined in stop().
     std::mutex thread_mu_;
-    std::vector<std::thread> stream_threads_;
+    std::vector<std::pair<std::weak_ptr<StreamSession>, std::thread>> stream_threads_;
 
     AppConfig   cfg_;       ///< Application configuration.
     IqFetcher   fetcher_;   ///< IQ sample fetcher.

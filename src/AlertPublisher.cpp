@@ -53,7 +53,7 @@ void AlertPublisher::publish(const std::string& alert_json, double freq_hz) {
     }
     proton::message msg(body);
     wq_->add([this, msg]() mutable {
-        if (sender_ && sender_.credit() > 0) sender_.send(msg);
+        if (sender_) sender_.send(msg);
     });
 }
 

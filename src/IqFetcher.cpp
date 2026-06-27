@@ -70,7 +70,13 @@ public:
 
     void stop() {
         if (container_) {
-            if (wq_) wq_->add([this]{ sender_.connection().close(); });
+            if (wq_)
+                wq_->add([this]{ sender_.connection().close(); });
+            else
+                // wq_ is null when the broker was never reached (reconnect loop
+                // still running). Without this, thread_.join() blocks forever
+                // under max_attempts(0) — same fix as GpsApp::AmqpPublisher.
+                container_->stop();
             if (thread_.joinable()) thread_.join();
             container_.reset();
         }
@@ -91,8 +97,10 @@ public:
             msg.body(body);
             msg.content_type("application/json");
             msg.reply_to(reply_addr_);
-            if (sender_ && sender_.credit() > 0)
-                sender_.send(msg);
+            // Do NOT check credit() — proton queues when credit arrives.
+            // Checking credit causes silent drops when the receiver hasn't
+            // yet propagated credit back (same fix as AmqpClient::sendOn).
+            if (sender_) sender_.send(msg);
         });
         std::unique_lock lk(mu_);
         result_cv_.wait_for(lk, milliseconds(timeout_ms),
@@ -107,7 +115,7 @@ public:
             proton::message msg;
             msg.body(body);
             msg.content_type("application/json");
-            if (sender_ && sender_.credit() > 0) sender_.send(msg);
+            if (sender_) sender_.send(msg);
         });
     }
 
@@ -323,6 +331,14 @@ std::vector<std::complex<float>> IqFetcher::collect(au::QuantityD<au::Hertz>   c
     if (fd >= 0 && port > 0 && udp_port != port) {
         ::close(fd);
         fd = openBoundUdpSocket(static_cast<uint16_t>(udp_port));
+    } else if (fd < 0) {
+        // Initial bind failed; try binding to the server-assigned port now.
+        fd = openBoundUdpSocket(static_cast<uint16_t>(udp_port));
+    }
+
+    if (fd < 0) {
+        spdlog::error("IqFetcher: cannot open UDP socket for port {}", udp_port);
+        return {};
     }
 
     int n_samples = static_cast<int>(sample_rate_sps * duration_s);

@@ -89,6 +89,7 @@ public:
     {}
 
     void on_container_start(proton::container& c) override {
+        container_ = &c;
         proton::connection_options opts;
         if (!cfg_.username.empty()) {
             opts.sasl_allowed_mechs("PLAIN");
@@ -162,7 +163,7 @@ public:
         if (!wq_) return;
         std::string b = body;
         wq_->add([this, b]() mutable {
-            if (sender_ && sender_.credit() > 0) {
+            if (sender_) {
                 proton::message msg;
                 msg.body(b);
                 msg.content_type("application/json");
@@ -173,7 +174,12 @@ public:
     }
 
     void close() {
-        if (wq_) wq_->add([this]{ sender_.connection().close(); });
+        if (wq_)
+            wq_->add([this]{ sender_.connection().close(); });
+        else if (container_)
+            // Broker never reached; stop the reactor so subscriptionLoop's
+            // container->run() returns and sub_thread_ can be joined.
+            container_->stop();
     }
 
     void on_transport_error(proton::transport& t) override {
@@ -188,6 +194,7 @@ private:
     std::function<void(const PendingDemod&)>              on_result_;
     std::function<void(const std::string&, const PendingDemod&)> on_start_stream_;
     std::function<void(const std::string&)>               on_stop_;
+    proton::container*  container_{nullptr};
     proton::sender sender_;
     proton::work_queue* wq_{nullptr};
     std::mutex mu_;
@@ -233,8 +240,8 @@ void DemodService::stop() {
     // Join stream threads (each may still be mid-fetch — wait for them).
     {
         std::lock_guard lk(thread_mu_);
-        for (auto& t : stream_threads_)
-            if (t.joinable()) t.join();
+        for (auto& p : stream_threads_)
+            if (p.second.joinable()) p.second.join();
         stream_threads_.clear();
     }
 }
@@ -309,16 +316,36 @@ void DemodService::startStream(const std::string& stream_id, const PendingDemod&
     spdlog::info("DemodService: starting stream {} for {:.3f} MHz {}",
                  stream_id, p.center_freq.in(au::hertz) / 1e6, p.modulation);
     std::lock_guard lk(thread_mu_);
-    stream_threads_.emplace_back([this, stream_id]() {
-        StreamPtr session;
-        {
-            std::lock_guard slk(streams_mu_);
-            auto it = streams_.find(stream_id);
-            if (it == streams_.end()) return;
-            session = it->second;
-        }
-        streamLoop(session, stream_id);
-    });
+    // Prune threads whose sessions have finished to bound vector growth.
+    stream_threads_.erase(
+        std::remove_if(stream_threads_.begin(), stream_threads_.end(),
+            [](auto& p) {
+                auto sess = p.first.lock();
+                if (sess && !sess->done.load()) return false;
+                if (p.second.joinable()) p.second.join();
+                return true;
+            }),
+        stream_threads_.end());
+    // Grab a weak_ptr to the just-inserted session so we can detect when the
+    // thread is done without waiting for it (used by the pruner above).
+    std::weak_ptr<StreamSession> weak_sess;
+    {
+        std::lock_guard slk(streams_mu_);
+        auto it = streams_.find(stream_id);
+        if (it != streams_.end()) weak_sess = it->second;
+    }
+    stream_threads_.emplace_back(
+        std::move(weak_sess),
+        std::thread([this, stream_id]() {
+            StreamPtr session;
+            {
+                std::lock_guard slk(streams_mu_);
+                auto it = streams_.find(stream_id);
+                if (it == streams_.end()) return;
+                session = it->second;
+            }
+            streamLoop(session, stream_id);
+        }));
 }
 
 void DemodService::stopStream(const std::string& stream_id)
@@ -359,8 +386,13 @@ void DemodService::streamLoop(StreamPtr session, std::string stream_id)
 
     spdlog::info("DemodService: stream {} ended (chunk={})", stream_id, chunk);
     // Remove session entry if it hasn't been removed already (e.g. natural stop).
-    std::lock_guard lk(streams_mu_);
-    streams_.erase(stream_id);
+    {
+        std::lock_guard lk(streams_mu_);
+        streams_.erase(stream_id);
+    }
+    // Signal done so the pruner in startStream() can join this thread without
+    // blocking. session is still valid here (held by the parameter shared_ptr).
+    session->done.store(true);
 }
 
 void DemodService::publishResult(const DemodResult& r) {
