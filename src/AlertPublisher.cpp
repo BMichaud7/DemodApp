@@ -41,6 +41,7 @@ void AlertPublisher::stop() {
         // indefinitely. Matches AcquisitionApp::AmqpPublisher / TaskAmqpChannel.
         container_.stop();
     if (thread_.joinable()) thread_.join();
+    wq_ = nullptr;  // prevent double-stop from posting to a dead work queue
 }
 
 void AlertPublisher::publish(const std::string& alert_json, double freq_hz) {

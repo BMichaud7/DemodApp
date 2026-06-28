@@ -95,6 +95,7 @@ private:
     std::unique_ptr<p25::P25ControlDecoder> decoder_;
 
     // AMQP publisher for grants
+    Handler*                                handler_{nullptr};
     std::unique_ptr<proton::container>      pub_container_;
     std::thread                             pub_thread_;
     std::mutex                              pub_mu_;

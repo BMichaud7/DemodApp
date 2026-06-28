@@ -207,7 +207,11 @@ private:
 DemodService::DemodService(const AppConfig& cfg)
     : cfg_(cfg)
     , fetcher_(cfg.broker, cfg.local_ip, cfg.engine.rank)
-    , router_(cfg, fetcher_, [this](const DemodResult& r){ publishResult(r); })
+    , router_(cfg, fetcher_,
+              [this](const DemodResult& r){ publishResult(r); },
+              [this](const std::string& j, double f){
+                  if (alert_pub_) alert_pub_->publish(j, f);
+              })
 {}
 
 DemodService::~DemodService() { stop(); }
@@ -215,10 +219,19 @@ DemodService::~DemodService() { stop(); }
 void DemodService::start() {
     if (running_.exchange(true)) return;
     ::mkdir(cfg_.output.output_dir.c_str(), 0755);
+
+    if (cfg_.threat.enabled) {
+        alert_pub_ = std::make_unique<AlertPublisher>(
+            cfg_.broker.url, cfg_.broker.username, cfg_.broker.password,
+            cfg_.threat.alert_topic);
+        alert_pub_->start();
+    }
+
     worker_thread_ = std::thread(&DemodService::workerLoop, this);
     sub_thread_    = std::thread(&DemodService::subscriptionLoop, this);
-    spdlog::info("DemodService: started (req={} pub={})",
-                 cfg_.broker.demod_request_queue, cfg_.broker.demod_topic);
+    spdlog::info("DemodService: started (req={} pub={}{})",
+                 cfg_.broker.demod_request_queue, cfg_.broker.demod_topic,
+                 cfg_.threat.enabled ? " threat=on" : "");
 }
 
 void DemodService::stop() {
@@ -237,13 +250,17 @@ void DemodService::stop() {
     if (sub_thread_.joinable())    sub_thread_.join();
     if (worker_thread_.joinable()) worker_thread_.join();
 
-    // Join stream threads (each may still be mid-fetch — wait for them).
+    // Join stream threads before stopping alert_pub_ — stream threads call
+    // publishResult() which may call alert_pub_->publish(); destroying
+    // alert_pub_ while stream threads still run is a use-after-free.
     {
         std::lock_guard lk(thread_mu_);
         for (auto& p : stream_threads_)
             if (p.second.joinable()) p.second.join();
         stream_threads_.clear();
     }
+
+    if (alert_pub_) { alert_pub_->stop(); alert_pub_.reset(); }
 }
 
 void DemodService::subscriptionLoop() {

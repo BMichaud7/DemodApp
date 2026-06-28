@@ -16,6 +16,7 @@ Contact author for permission: https://github.com/OpenRFStack
  */
 #pragma once
 #include "AppConfig.hpp"
+#include "AlertPublisher.hpp"
 #include "IqFetcher.hpp"
 #include "DemodRouter.hpp"
 #include <atomic>
@@ -157,6 +158,7 @@ private:
 
 
     std::shared_ptr<ServiceAmqpHandler> amqp_handler_; ///< AMQP session handler.
+    std::unique_ptr<AlertPublisher>     alert_pub_;    ///< Threat alert publisher (null when disabled).
 };
 
 } // namespace demod

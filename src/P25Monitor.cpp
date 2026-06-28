@@ -93,8 +93,8 @@ P25Monitor::P25Monitor(const AppConfig& cfg, const P25Config& p25cfg,
 P25Monitor::~P25Monitor() { stop(); }
 
 void P25Monitor::start() {
-    auto* h = new Handler(*this);
-    pub_container_ = std::make_unique<proton::container>(*h);
+    handler_ = new Handler(*this);
+    pub_container_ = std::make_unique<proton::container>(*handler_);
     pub_thread_ = std::thread([this]{ pub_container_->run(); });
     spdlog::info("[P25Monitor] started (control_freq={:.4f} MHz)",
                  p25cfg_.control_freq_hz / 1e6);
@@ -105,6 +105,8 @@ void P25Monitor::stop() {
         pub_container_->stop();
         if (pub_thread_.joinable()) pub_thread_.join();
         pub_container_.reset();
+        delete handler_;
+        handler_ = nullptr;
     }
 }
 
@@ -208,11 +210,16 @@ void P25Monitor::publish_grant(const p25::ChannelGrant& grant) {
         {"site_id", decoder_->site_info().site_id},
     };
 
-    // Published to rf.p25.grants — future subscribers retune SDR to freq_hz
-    spdlog::debug("[P25Monitor] publishing grant JSON");
-    // Note: actual AMQP publish requires access to the proton sender in Handler.
-    // For now, log the JSON — full publish wired via shared sender ref in future iteration.
-    spdlog::info("[P25Monitor] {}", j.dump());
+    std::string body = j.dump();
+    spdlog::debug("[P25Monitor] publishing grant: {}", body);
+
+    // publish_grant is called from within on_message (reactor thread), so
+    // sender_.send() is safe here — no cross-thread dispatch needed.
+    if (handler_ && handler_->sender_) {
+        proton::message msg(body);
+        msg.content_type("application/json");
+        handler_->sender_.send(msg);
+    }
 }
 
 } // namespace demod
