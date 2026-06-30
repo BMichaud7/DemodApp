@@ -246,7 +246,16 @@ void DemodService::stop() {
     }
 
     q_cv_.notify_all();
-    if (amqp_handler_) amqp_handler_->close();
+    {
+        // Copy under q_mu_ to avoid data race with subscriptionLoop()
+        // reassigning amqp_handler_ between reconnect attempts.
+        std::shared_ptr<ServiceAmqpHandler> h;
+        {
+            std::lock_guard lk(q_mu_);
+            h = amqp_handler_;
+        }
+        if (h) h->close();
+    }
     if (sub_thread_.joinable())    sub_thread_.join();
     if (worker_thread_.joinable()) worker_thread_.join();
 
@@ -268,8 +277,14 @@ void DemodService::subscriptionLoop() {
         auto on_det   = [this](const PendingDemod& p){ onDemodRequest(p); };
         auto on_start = [this](const std::string& sid, const PendingDemod& p){ startStream(sid, p); };
         auto on_stop  = [this](const std::string& sid){ stopStream(sid); };
-        amqp_handler_ = std::make_shared<ServiceAmqpHandler>(cfg_.broker, on_det, on_start, on_stop);
-        auto container = std::make_shared<proton::container>(*amqp_handler_);
+        std::shared_ptr<ServiceAmqpHandler> handler;
+        {
+            std::lock_guard lk(q_mu_);
+            if (!running_.load()) break;
+            amqp_handler_ = std::make_shared<ServiceAmqpHandler>(cfg_.broker, on_det, on_start, on_stop);
+            handler = amqp_handler_;
+        }
+        auto container = std::make_shared<proton::container>(*handler);
         try {
             container->run();
         } catch (const std::exception& ex) {
@@ -455,7 +470,12 @@ void DemodService::publishResult(const DemodResult& r) {
     }
 
     // ── Publish to rf.demod ──────────────────────────────────────────────────
-    if (!cfg_.output.publish_amqp || !amqp_handler_) return;
+    std::shared_ptr<ServiceAmqpHandler> pub_handler;
+    {
+        std::lock_guard lk(q_mu_);
+        pub_handler = amqp_handler_;
+    }
+    if (!cfg_.output.publish_amqp || !pub_handler) return;
 
     json j;
     j["msg_type"]        = "DEMOD_RESULT";
@@ -493,7 +513,7 @@ void DemodService::publishResult(const DemodResult& r) {
                 r.raw_iq.data(), r.raw_iq.size() * sizeof(std::complex<float>));
     }
 
-    amqp_handler_->publish(j.dump());
+    pub_handler->publish(j.dump());
 }
 
 } // namespace demod
