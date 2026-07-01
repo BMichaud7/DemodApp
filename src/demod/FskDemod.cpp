@@ -88,6 +88,7 @@ DemodResult FskDemod::process(const std::vector<std::complex<float>>& iq,
         float bw = 0.25f;  // normalized bandwidth for fskdem
 
         fskdem demod = fskdem_create(m_ary_, k, bw);
+        if (!demod) throw std::runtime_error("fskdem_create failed");
 
         int n_sym = static_cast<int>(iq.size()) / static_cast<int>(k);
         r.bits.reserve(static_cast<size_t>((n_sym * bps + 7) / 8));
