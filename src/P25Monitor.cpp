@@ -60,20 +60,48 @@ public:
             proton::receiver_options().source(
                 proton::source_options().address("rf.detections")));
         sender_ = conn.open_sender(mon_.p25cfg_.grant_topic);
+        // Store the work queue so publish_grant() can post sender_.send()
+        // back onto the reactor thread from the decode worker thread.
+        sender_wq_.store(&sender_.work_queue());
         spdlog::info("[P25Monitor] connected → {} | grants → {}",
                      mon_.cfg_.broker.url, mon_.p25cfg_.grant_topic);
     }
 
     void on_message(proton::delivery& d, proton::message& m) override {
+        // Quick filter on the reactor thread (no blocking), then enqueue
+        // center_freq for the decode worker thread.  Previously this called
+        // fetcher_.collect() directly from on_message, blocking the proton
+        // event loop for 3–13 s and causing AMQP heartbeat timeouts.
         try {
-            mon_.process_detection(json::parse(m.body().get<std::string>()));
+            auto j = json::parse(m.body().get<std::string>());
+            if (j.value("msg_type", "") == "RF_DETECTION") {
+                double cf = j.value("center_freq_hz", 0.0);
+                if (cf > 0) {
+                    bool freq_ok = true;
+                    if (mon_.p25cfg_.control_freq_hz > 0)
+                        freq_ok = std::abs(cf - mon_.p25cfg_.control_freq_hz) <= 25000.0;
+                    if (freq_ok) {
+                        double bw = j.value("bandwidth_hz", 0.0);
+                        if (bw <= 0 || (bw >= 8000.0 && bw <= 20000.0)) {
+                            std::lock_guard lk(mon_.decode_mu_);
+                            mon_.decode_queue_.push_back(cf);
+                            mon_.decode_cv_.notify_one();
+                        }
+                    }
+                }
+            }
         } catch (...) {}
         d.accept();
     }
 
+    void on_transport_error(proton::transport&) override {
+        sender_wq_.store(nullptr);
+    }
+
     void on_sendable(proton::sender&) override {}
 
-    proton::sender sender_;
+    proton::sender                   sender_;
+    std::atomic<proton::work_queue*> sender_wq_{nullptr};
     P25Monitor& mon_;
 };
 
@@ -96,11 +124,33 @@ void P25Monitor::start() {
     handler_ = new Handler(*this);
     pub_container_ = std::make_unique<proton::container>(*handler_);
     pub_thread_ = std::thread([this]{ pub_container_->run(); });
+
+    decode_running_ = true;
+    decode_thread_ = std::thread([this]{
+        while (decode_running_) {
+            double freq_hz = 0.0;
+            {
+                std::unique_lock lk(decode_mu_);
+                decode_cv_.wait(lk, [this]{
+                    return !decode_queue_.empty() || !decode_running_;
+                });
+                if (!decode_running_ && decode_queue_.empty()) break;
+                freq_hz = decode_queue_.front();
+                decode_queue_.pop_front();
+            }
+            if (freq_hz > 0) decode_control_channel(freq_hz);
+        }
+    });
+
     spdlog::info("[P25Monitor] started (control_freq={:.4f} MHz)",
                  p25cfg_.control_freq_hz / 1e6);
 }
 
 void P25Monitor::stop() {
+    decode_running_ = false;
+    decode_cv_.notify_all();
+    if (decode_thread_.joinable()) decode_thread_.join();
+
     if (pub_container_) {
         pub_container_->stop();
         if (pub_thread_.joinable()) pub_thread_.join();
@@ -111,26 +161,6 @@ void P25Monitor::stop() {
 }
 
 // ── Detection processing ───────────────────────────────────────────────────────
-
-void P25Monitor::process_detection(const json& det) {
-    if (det.value("msg_type", "") != "RF_DETECTION") return;
-
-    double cf = det.value("center_freq_hz", 0.0);
-    if (cf <= 0) return;
-
-    // If control_freq_hz configured: only process near that frequency
-    if (p25cfg_.control_freq_hz > 0) {
-        double diff = std::abs(cf - p25cfg_.control_freq_hz);
-        if (diff > 25000.0) return;  // >25 kHz away — not our control channel
-    }
-
-    // Check if modulation looks like P25 (FSK-like, ~12.5 kHz BW)
-    double bw = det.value("bandwidth_hz", 0.0);
-    if (bw > 0 && (bw < 8000.0 || bw > 20000.0)) return;
-
-    spdlog::debug("[P25Monitor] candidate control channel at {:.4f} MHz", cf / 1e6);
-    decode_control_channel(cf);
-}
 
 // ── Control channel decoding ──────────────────────────────────────────────────
 
@@ -213,12 +243,17 @@ void P25Monitor::publish_grant(const p25::ChannelGrant& grant) {
     std::string body = j.dump();
     spdlog::debug("[P25Monitor] publishing grant: {}", body);
 
-    // publish_grant is called from within on_message (reactor thread), so
-    // sender_.send() is safe here — no cross-thread dispatch needed.
-    if (handler_ && handler_->sender_) {
-        proton::message msg(body);
-        msg.content_type("application/json");
-        handler_->sender_.send(msg);
+    // publish_grant is now called from the decode worker thread, not the
+    // reactor thread.  sender_.send() must run on the reactor thread, so we
+    // post via sender_wq_ (stored atomically in on_connection_open).
+    if (handler_) {
+        if (auto* wq = handler_->sender_wq_.load()) {
+            proton::message msg(body);
+            msg.content_type("application/json");
+            wq->add([this, msg]() mutable {
+                if (handler_ && handler_->sender_) handler_->sender_.send(msg);
+            });
+        }
     }
 }
 
