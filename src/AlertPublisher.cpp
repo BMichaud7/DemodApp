@@ -31,8 +31,8 @@ void AlertPublisher::start() {
 
 void AlertPublisher::stop() {
     stopping_ = true;
-    if (wq_)
-        wq_->add([this]{ sender_.connection().close(); });
+    if (auto* wq = wq_.load())
+        wq->add([this]{ sender_.connection().close(); });
     else
         // Connection never reached on_sender_open (e.g. still mid-reconnect
         // after Artemis wasn't up at start()), so there's no work queue to
@@ -41,11 +41,12 @@ void AlertPublisher::stop() {
         // indefinitely. Matches AcquisitionApp::AmqpPublisher / TaskAmqpChannel.
         container_.stop();
     if (thread_.joinable()) thread_.join();
-    wq_ = nullptr;  // prevent double-stop from posting to a dead work queue
+    wq_.store(nullptr);  // prevent double-stop from posting to a dead work queue
 }
 
 void AlertPublisher::publish(const std::string& alert_json, double freq_hz) {
-    if (!wq_ || stopping_) return;
+    auto* wq = wq_.load();
+    if (!wq || stopping_) return;
     // Embed freq_hz into the JSON before sending
     std::string body = alert_json;
     if (!body.empty() && body.back() == '}') {
@@ -53,7 +54,7 @@ void AlertPublisher::publish(const std::string& alert_json, double freq_hz) {
         body += ",\"freq_hz\":" + std::to_string(freq_hz) + "}";
     }
     proton::message msg(body);
-    wq_->add([this, msg]() mutable {
+    wq->add([this, msg]() mutable {
         if (sender_) sender_.send(msg);
     });
 }
@@ -87,7 +88,7 @@ void AlertPublisher::on_connection_open(proton::connection& c) {
 
 void AlertPublisher::on_sender_open(proton::sender& s) {
     sender_ = s;
-    wq_     = &s.work_queue();
+    wq_.store(&s.work_queue());
     spdlog::info("[AlertPublisher] connected → {}", topic_);
 }
 

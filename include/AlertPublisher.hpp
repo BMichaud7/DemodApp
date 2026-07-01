@@ -97,7 +97,7 @@ private:
     std::string          topic_;    ///< Destination topic address.
     proton::container    container_;///< Proton messaging container.
     proton::sender       sender_;   ///< Outbound AMQP sender link.
-    proton::work_queue*  wq_{nullptr}; ///< Work queue for thread-safe publish.
+    std::atomic<proton::work_queue*> wq_{nullptr}; ///< Work queue for thread-safe publish.
     std::thread          thread_;   ///< Thread running container_.run().
     std::atomic<bool>    stopping_{false}; ///< Set by stop() to suppress error logs.
 };
