@@ -30,6 +30,7 @@ Contact author for permission: https://github.com/OpenRFStack
 #include <sdr/Base64.hpp>
 #include <spdlog/spdlog.h>
 
+#include <atomic>
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
@@ -89,7 +90,7 @@ public:
     {}
 
     void on_container_start(proton::container& c) override {
-        container_ = &c;
+        container_.store(&c);
         proton::connection_options opts;
         if (!cfg_.username.empty()) {
             opts.sasl_allowed_mechs("PLAIN");
@@ -113,7 +114,7 @@ public:
 
     void on_sender_open(proton::sender& s) override {
         sender_ = s;
-        wq_     = &s.work_queue();
+        wq_.store(&s.work_queue());
         std::lock_guard lk(mu_);
         ready_ = true;
         ready_cv_.notify_all();
@@ -160,9 +161,10 @@ public:
         std::unique_lock lk(mu_);
         if (!ready_cv_.wait_for(lk, std::chrono::seconds(5),
                                 [this]{ return ready_; })) return;
-        if (!wq_) return;
+        auto* wq = wq_.load();
+        if (!wq) return;
         std::string b = body;
-        wq_->add([this, b]() mutable {
+        wq->add([this, b]() mutable {
             if (sender_) {
                 proton::message msg;
                 msg.body(b);
@@ -174,12 +176,12 @@ public:
     }
 
     void close() {
-        if (wq_)
-            wq_->add([this]{ sender_.connection().close(); });
-        else if (container_)
+        if (auto* wq = wq_.load())
+            wq->add([this]{ sender_.connection().close(); });
+        else if (auto* c = container_.load())
             // Broker never reached; stop the reactor so subscriptionLoop's
             // container->run() returns and sub_thread_ can be joined.
-            container_->stop();
+            c->stop();
     }
 
     void on_transport_error(proton::transport& t) override {
@@ -194,9 +196,9 @@ private:
     std::function<void(const PendingDemod&)>              on_result_;
     std::function<void(const std::string&, const PendingDemod&)> on_start_stream_;
     std::function<void(const std::string&)>               on_stop_;
-    proton::container*  container_{nullptr};
+    std::atomic<proton::container*>  container_{nullptr};
     proton::sender sender_;
-    proton::work_queue* wq_{nullptr};
+    std::atomic<proton::work_queue*> wq_{nullptr};
     std::mutex mu_;
     std::condition_variable ready_cv_;
     bool ready_{false};

@@ -41,6 +41,7 @@ Contact author for permission: https://github.com/OpenRFStack
 #include <unistd.h>
 #include <sys/select.h>
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <thread>
@@ -70,8 +71,8 @@ public:
 
     void stop() {
         if (container_) {
-            if (wq_)
-                wq_->add([this]{ sender_.connection().close(); });
+            if (auto* wq = wq_.load())
+                wq->add([this]{ sender_.connection().close(); });
             else
                 // wq_ is null when the broker was never reached (reconnect loop
                 // still running). Without this, thread_.join() blocks forever
@@ -92,16 +93,17 @@ public:
             pending_body_.clear();
             pending_done_ = false;
         }
-        wq_->add([this, body]() mutable {
-            proton::message msg;
-            msg.body(body);
-            msg.content_type("application/json");
-            msg.reply_to(reply_addr_);
-            // Do NOT check credit() — proton queues when credit arrives.
-            // Checking credit causes silent drops when the receiver hasn't
-            // yet propagated credit back (same fix as AmqpClient::sendOn).
-            if (sender_) sender_.send(msg);
-        });
+        if (auto* wq = wq_.load())
+            wq->add([this, body]() mutable {
+                proton::message msg;
+                msg.body(body);
+                msg.content_type("application/json");
+                msg.reply_to(reply_addr_);
+                // Do NOT check credit() — proton queues when credit arrives.
+                // Checking credit causes silent drops when the receiver hasn't
+                // yet propagated credit back (same fix as AmqpClient::sendOn).
+                if (sender_) sender_.send(msg);
+            });
         std::unique_lock lk(mu_);
         result_cv_.wait_for(lk, milliseconds(timeout_ms),
                             [this]{ return pending_done_; });
@@ -111,7 +113,9 @@ public:
     void send(const std::string& body) {
         std::unique_lock lk(mu_);
         if (!ready_) return;
-        wq_->add([this, body]() mutable {
+        auto* wq = wq_.load();
+        if (!wq) return;
+        wq->add([this, body]() mutable {
             proton::message msg;
             msg.body(body);
             msg.content_type("application/json");
@@ -147,7 +151,7 @@ public:
 
     void on_receiver_open(proton::receiver& r) override {
         reply_addr_ = r.source().address();
-        wq_ = &r.work_queue();
+        wq_.store(&r.work_queue());
         std::lock_guard lk(mu_);
         ready_ = true;
         ready_cv_.notify_all();
@@ -180,9 +184,9 @@ private:
     std::string url_, user_, pass_, req_queue_;
     std::unique_ptr<proton::container> container_;
     std::thread thread_;
-    proton::sender sender_;
-    proton::work_queue* wq_{nullptr};
-    std::string reply_addr_;
+    proton::sender                   sender_;
+    std::atomic<proton::work_queue*> wq_{nullptr};
+    std::string                      reply_addr_;
     std::mutex mu_;
     std::condition_variable ready_cv_, result_cv_;
     bool ready_{false};
