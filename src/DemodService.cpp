@@ -404,9 +404,14 @@ void DemodService::streamLoop(StreamPtr session, std::string stream_id)
     while (session->active.load() && running_.load()) {
         std::string req_id = stream_id + "-" + std::to_string(chunk++);
         auto& p = session->params;
-        bool ok = router_.route(p.modulation, p.center_freq, p.bandwidth,
-                                p.symbol_rate, p.confidence,
-                                p.timestamp, req_id, stream_id);
+        bool ok = false;
+        try {
+            ok = router_.route(p.modulation, p.center_freq, p.bandwidth,
+                               p.symbol_rate, p.confidence,
+                               p.timestamp, req_id, stream_id);
+        } catch (const std::exception& ex) {
+            spdlog::error("DemodService: stream {} error: {}", stream_id, ex.what());
+        }
         if (!ok) {
             if (++failures >= MAX_CONSECUTIVE_FAILURES) {
                 spdlog::warn("DemodService: stream {} stopping — {} consecutive IQ failures",
