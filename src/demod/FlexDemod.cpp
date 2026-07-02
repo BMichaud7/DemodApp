@@ -69,7 +69,7 @@ DemodResult FlexDemod::process(const std::vector<std::complex<float>>& iq,
         symsync_rrrf_execute(sync,&fd,1,buf,&n);
         for (unsigned i=0;i<n;++i) {
             // 4-level slicer: +1800→01, +600→00, -600→10, -1800→11
-            uint8_t d = fd> 0.5f?1:fd>0.0f?0:fd>-0.5f?2:3;
+            uint8_t d = buf[i]> 0.5f?1:buf[i]>0.0f?0:buf[i]>-0.5f?2:3;
             bits.push_back((d>>1)&1); bits.push_back(d&1);
         }
     }
