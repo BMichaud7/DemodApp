@@ -22,12 +22,14 @@ static constexpr double DMR_SYMBOL_RATE = 4800.0;
 static constexpr double DMR_DEV_OUTER   = 1944.0;  // Hz
 static constexpr double DMR_MOD_INDEX   = DMR_DEV_OUTER / DMR_SYMBOL_RATE;
 
+// Slice freqdem output (normalised to ±1 for outer deviation) to a DMR dibit.
+// Inner deviation is 1/3 of outer (±648 Hz vs ±1944 Hz).  The threshold between
+// inner and outer is at the midpoint: (1/3 + 1) / 2 ≈ 0.667.
 static uint8_t slice_dmr(float s) {
-    float norm = s / (DMR_DEV_OUTER / DMR_SYMBOL_RATE);  // normalise to ±1
-    if (norm >  0.5f) return 1;
-    if (norm >  0.0f) return 0;
-    if (norm > -0.5f) return 2;
-    return 3;
+    if (s >  0.667f) return 1;  // +outer
+    if (s >  0.0f)   return 0;  // +inner
+    if (s > -0.667f) return 2;  // -inner
+    return 3;                    // -outer
 }
 
 DemodResult DmrDemod::process(const std::vector<std::complex<float>>& iq,
@@ -47,7 +49,9 @@ DemodResult DmrDemod::process(const std::vector<std::complex<float>>& iq,
 
     float sps = static_cast<float>(sr.in(au::hertz) / DMR_SYMBOL_RATE);
 
-    freqdem fdem = freqdem_create(static_cast<float>(DMR_MOD_INDEX));
+    // kf = deviation / sample_rate (not deviation / symbol_rate).
+    float kf_dmr = std::clamp(static_cast<float>(DMR_DEV_OUTER / sr.in(au::hertz)), 0.01f, 0.49f);
+    freqdem fdem = freqdem_create(kf_dmr);
     symsync_rrrf symsync = symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_RRC, static_cast<unsigned>(std::round(sps)), 5, 0.2f, 32);
     symsync_rrrf_set_lf_bw(symsync, 0.01f);

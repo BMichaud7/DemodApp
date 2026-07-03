@@ -45,7 +45,9 @@ DemodResult DscDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps=static_cast<float>(sr.in(au::hertz)/DSC_BAUD);
-    freqdem fdem=freqdem_create(static_cast<float>(DSC_DEV/DSC_BAUD));
+    // kf = deviation / sample_rate (not deviation / baud).
+    float kf_dsc=std::clamp(static_cast<float>(DSC_DEV/sr.in(au::hertz)),0.01f,0.49f);
+    freqdem fdem=freqdem_create(kf_dsc);
     symsync_rrrf sync=symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.4f,32);
     symsync_rrrf_set_lf_bw(sync,0.01f);

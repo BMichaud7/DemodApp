@@ -41,14 +41,13 @@ struct C4FmDemod::Impl {
     freqdem   fdem   = nullptr;
     symsync_rrrf symsync = nullptr;
 
-    // FM modulation index = max_dev / symbol_rate = 1800/4800 = 0.375
-    static constexpr float MOD_INDEX = 1800.0f / 4800.0f;
-
     Impl(double sr, double sym_rate) : sample_rate(sr), symbol_rate(sym_rate) {
         float sps = static_cast<float>(sr / sym_rate);
 
-        // FM discriminator
-        fdem = freqdem_create(MOD_INDEX);
+        // kf = max_deviation / sample_rate (not max_deviation / symbol_rate).
+        // C4FM outer deviation is ±1800 Hz.
+        float kf = std::clamp(1800.0f / static_cast<float>(sr), 0.01f, 0.49f);
+        fdem = freqdem_create(kf);
 
         // Symbol synchroniser (RRC filter, 5 taps/side, β=0.2)
         symsync = symsync_rrrf_create_rnyquist(

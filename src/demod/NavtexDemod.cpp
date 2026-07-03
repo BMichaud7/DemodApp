@@ -39,7 +39,9 @@ DemodResult NavtexDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps=static_cast<float>(sr.in(au::hertz)/NAVTEX_BAUD);
-    freqdem fdem=freqdem_create(static_cast<float>(NAVTEX_DEV/NAVTEX_BAUD));
+    // kf = deviation / sample_rate (not deviation / baud).
+    float kf_nav=std::clamp(static_cast<float>(NAVTEX_DEV/sr.in(au::hertz)),0.01f,0.49f);
+    freqdem fdem=freqdem_create(kf_nav);
     symsync_rrrf sync=symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.5f,32);
     symsync_rrrf_set_lf_bw(sync,0.005f);

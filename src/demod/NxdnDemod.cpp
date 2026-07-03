@@ -20,10 +20,12 @@ namespace demod {
 static constexpr double NXDN_SYMBOL_RATE = 4800.0;
 static constexpr double NXDN_DEV_OUTER   = 3150.0;
 
+// Slice freqdem output (normalised to ±1 for outer deviation) to an NXDN dibit.
+// Inner deviation is 1/3 of outer (±1050 Hz vs ±3150 Hz); threshold at midpoint ≈ 0.667.
 static uint8_t slice_nxdn(float s) {
-    if (s >  1.5f) return 1;
-    if (s >  0.0f) return 0;
-    if (s > -1.5f) return 2;
+    if (s >  0.667f) return 1;
+    if (s >  0.0f)   return 0;
+    if (s > -0.667f) return 2;
     return 3;
 }
 
@@ -41,9 +43,10 @@ DemodResult NxdnDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps = static_cast<float>(sr.in(au::hertz)/NXDN_SYMBOL_RATE);
-    float mod  = static_cast<float>(NXDN_DEV_OUTER/NXDN_SYMBOL_RATE);
+    // kf = deviation / sample_rate (not deviation / symbol_rate).
+    float kf_nxdn = std::clamp(static_cast<float>(NXDN_DEV_OUTER/sr.in(au::hertz)), 0.01f, 0.49f);
 
-    freqdem fdem = freqdem_create(mod);
+    freqdem fdem = freqdem_create(kf_nxdn);
     symsync_rrrf sync = symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_RRC, static_cast<unsigned>(std::round(sps)), 5, 0.2f, 32);
     symsync_rrrf_set_lf_bw(sync, 0.01f);
