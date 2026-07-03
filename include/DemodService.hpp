@@ -19,6 +19,7 @@ Contact author for permission: https://github.com/OpenRFStack
 #include "AlertPublisher.hpp"
 #include "IqFetcher.hpp"
 #include "DemodRouter.hpp"
+#include "P25Monitor.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <memory>
@@ -159,6 +160,7 @@ private:
 
     std::shared_ptr<ServiceAmqpHandler> amqp_handler_; ///< AMQP session handler.
     std::unique_ptr<AlertPublisher>     alert_pub_;    ///< Threat alert publisher (null when disabled).
+    std::unique_ptr<P25Monitor>         p25_monitor_;  ///< P25 trunked control channel monitor (null when disabled).
 };
 
 } // namespace demod

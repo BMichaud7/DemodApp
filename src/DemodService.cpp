@@ -229,6 +229,21 @@ void DemodService::start() {
         alert_pub_->start();
     }
 
+    if (cfg_.p25.enabled) {
+        P25Config p25cfg;
+        p25cfg.enabled          = cfg_.p25.enabled;
+        p25cfg.control_freq_hz  = cfg_.p25.control_freq_hz;
+        p25cfg.sample_rate_hz   = cfg_.p25.sample_rate_hz;
+        p25cfg.capture_s        = cfg_.p25.capture_s;
+        p25cfg.grant_topic      = cfg_.p25.grant_topic;
+        p25cfg.tg_whitelist     = {cfg_.p25.tg_whitelist.begin(),
+                                   cfg_.p25.tg_whitelist.end()};
+        p25_monitor_ = std::make_unique<P25Monitor>(cfg_, p25cfg, fetcher_);
+        p25_monitor_->start();
+        spdlog::info("DemodService: P25Monitor started (ctrl={:.3f} MHz)",
+                     cfg_.p25.control_freq_hz / 1e6);
+    }
+
     worker_thread_ = std::thread(&DemodService::workerLoop, this);
     sub_thread_    = std::thread(&DemodService::subscriptionLoop, this);
     spdlog::info("DemodService: started (req={} pub={}{})",
@@ -271,6 +286,7 @@ void DemodService::stop() {
         stream_threads_.clear();
     }
 
+    if (p25_monitor_) { p25_monitor_->stop(); p25_monitor_.reset(); }
     if (alert_pub_) { alert_pub_->stop(); alert_pub_.reset(); }
 }
 
