@@ -57,7 +57,9 @@ DemodResult PocsagDemod::process(const std::vector<std::complex<float>>& iq,
     // Try 1200 bps as most common POCSAG rate
     double baud   = 1200.0;
     float  sps    = static_cast<float>(sr_hz / baud);
-    float  mi     = static_cast<float>(POCSAG_DEV / baud);
+    // kf = deviation / sample_rate (NOT deviation / baud — that gives kf>>0.5,
+    // which inverts the discriminator scale and breaks timing recovery).
+    float  mi     = std::clamp(static_cast<float>(POCSAG_DEV / sr_hz), 0.01f, 0.49f);
 
     freqdem fdem  = freqdem_create(mi);
     symsync_rrrf sync = symsync_rrrf_create_rnyquist(

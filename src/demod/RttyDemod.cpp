@@ -41,7 +41,9 @@ DemodResult RttyDemod::process(const std::vector<std::complex<float>>& iq,
 
     double sr_hz=sr.in(au::hertz);
     float sps=static_cast<float>(sr_hz/RTTY_BAUD);
-    freqdem fdem=freqdem_create(static_cast<float>(RTTY_DEV/RTTY_BAUD));
+    // kf = deviation / sample_rate (not deviation / baud — that gives kf >> 0.5).
+    float kf_rtty = std::clamp(static_cast<float>(RTTY_DEV/sr_hz), 0.01f, 0.49f);
+    freqdem fdem=freqdem_create(kf_rtty);
     symsync_rrrf sync=symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_RRC,static_cast<unsigned>(std::round(sps)),5,0.3f,32);
     symsync_rrrf_set_lf_bw(sync,0.005f);
