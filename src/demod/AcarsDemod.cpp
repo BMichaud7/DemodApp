@@ -56,15 +56,22 @@ DemodResult AcarsDemod::process(const std::vector<std::complex<float>>& iq,
 
     std::vector<uint8_t> bits;
     for (size_t i = 0; i + isps <= audio.size(); i += isps) {
-        // Goertzel-style: energy at mark vs space frequency
-        double e_mark = 0, e_space = 0;
+        // Goertzel-style: energy at mark vs space frequency.
+        // Accumulate both I and Q components so the energy estimate is
+        // phase-independent. Using only cos would null out signals that
+        // happen to be in quadrature with the reference, causing ~50% errors.
+        double mi=0, mq=0, si=0, sq=0;
         for (unsigned k = 0; k < isps; ++k) {
             double t = static_cast<double>(i + k) / sr_hz;
-            double sample = audio[i + k];
-            e_mark  += sample * std::cos(2*M_PI*ACARS_MARK *t);
-            e_space += sample * std::cos(2*M_PI*ACARS_SPACE*t);
+            double s  = audio[i + k];
+            double wm = 2*M_PI*ACARS_MARK *t;
+            double ws = 2*M_PI*ACARS_SPACE*t;
+            mi += s * std::cos(wm);  mq += s * std::sin(wm);
+            si += s * std::cos(ws);  sq += s * std::sin(ws);
         }
-        bits.push_back(std::abs(e_mark) > std::abs(e_space) ? 1 : 0);
+        double e_mark  = mi*mi + mq*mq;
+        double e_space = si*si + sq*sq;
+        bits.push_back(e_mark > e_space ? 1 : 0);
     }
 
     // Step 3: scan for ACARS preamble (0x2B2B2B2B = "++++" = prekey)
