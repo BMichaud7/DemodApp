@@ -79,6 +79,7 @@ public:
                 // under max_attempts(0) — same fix as GpsApp::AmqpPublisher.
                 container_->stop();
             if (thread_.joinable()) thread_.join();
+            wq_.store(nullptr);
             container_.reset();
         }
     }
