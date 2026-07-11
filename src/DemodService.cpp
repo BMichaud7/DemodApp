@@ -184,6 +184,12 @@ public:
             c->stop();
     }
 
+    void clear_work_queue() {
+        wq_.store(nullptr);
+        std::lock_guard lk(mu_);
+        ready_ = false;
+    }
+
     void on_transport_error(proton::transport& t) override {
         spdlog::warn("DemodService: transport error: {}", t.error().what());
     }
@@ -308,9 +314,14 @@ void DemodService::subscriptionLoop() {
         } catch (const std::exception& ex) {
             spdlog::error("DemodService: AMQP error: {}", ex.what());
         }
+        {
+            std::lock_guard lk(q_mu_);
+            if (amqp_handler_) amqp_handler_->clear_work_queue();
+        }
         if (!running_.load()) break;
         spdlog::info("DemodService: reconnecting in 3s...");
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        for (int i = 0; i < 30 && running_.load(); ++i)
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
