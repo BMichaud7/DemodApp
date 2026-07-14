@@ -12,6 +12,7 @@ Contact author for permission: https://github.com/OpenRFStack
 */
 #include "demod/FlexDemod.hpp"
 #include <liquid/liquid.h>
+#include <algorithm>
 #include <cmath>
 #include <spdlog/spdlog.h>
 
@@ -55,7 +56,7 @@ DemodResult FlexDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps = static_cast<float>(sr.in(au::hertz)/FLEX_BAUD);
-    float mi  = static_cast<float>(FLEX_DEV/FLEX_BAUD);
+    float mi  = std::clamp(static_cast<float>(FLEX_DEV/sr.in(au::hertz)), 0.01f, 0.49f);
 
     freqdem fdem = freqdem_create(mi);
     symsync_rrrf sync = symsync_rrrf_create_rnyquist(
