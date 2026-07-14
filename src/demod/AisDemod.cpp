@@ -110,7 +110,8 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
                 spdlog::warn("[ALERT] AIS spoofing: MMSI={} SOG={:.1f} kt", mmsi, sog_kt);
             }
             // MMSI sanity: must be 9 digits, 100000000–999999999
-            if (mmsi < 100000000 || mmsi > 999999999) {
+            // Only set if no higher-severity alert already fired.
+            if (r.alert_json.empty() && (mmsi < 100000000 || mmsi > 999999999)) {
                 r.alert_json = "{\"type\":\"AIS_SPOOFING\",\"severity\":\"MEDIUM\","
                     "\"details\":\"Invalid MMSI " + std::to_string(mmsi) +
                     " (not 9 digits)\"}";

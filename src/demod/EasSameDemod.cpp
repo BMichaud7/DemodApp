@@ -96,9 +96,10 @@ DemodResult EasSameDemod::process(const std::vector<std::complex<float>>& iq,
                     "' in alert: "+header.substr(0,80)+"\"}";
                 spdlog::warn("[ALERT] EAS spoofing: invalid originator '{}'", org);
             }
-            // Flag rare/national-level events for manual review
+            // Flag rare/national-level events for manual review (only if no
+            // higher-severity alert already set for this message).
             for(auto& e:RARE_EVENTS){
-                if(evt==e){
+                if(evt==e && r.alert_json.empty()){
                     r.alert_json="{\"type\":\"EAS_SPOOFING\",\"severity\":\"MEDIUM\","
                         "\"details\":\"Rare EAS event code '"+evt+
                         "' — verify authenticity: "+header.substr(0,80)+"\"}";

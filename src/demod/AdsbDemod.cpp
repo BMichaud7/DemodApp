@@ -57,7 +57,8 @@ DemodResult AdsbDemod::process(const std::vector<std::complex<float>>& iq,
     mag.reserve(iq.size());
     for(const auto& s:iq) mag.push_back(std::abs(s));
 
-    float noise=0; for(size_t i=0;i<std::min((size_t)100,mag.size());++i) noise+=mag[i]; noise/=100;
+    size_t n_noise=std::min((size_t)100,mag.size());
+    float noise=0; for(size_t i=0;i<n_noise;++i) noise+=mag[i]; if(n_noise>0) noise/=(float)n_noise;
     float thresh=noise*3.5f;
 
     std::string messages;
