@@ -28,10 +28,14 @@ static std::string decode_alpha(const uint32_t* codewords, int n) {
     std::string out;
     int bit_buf = 0, nbits = 0;
     for (int i = 0; i < n; ++i) {
-        uint32_t cw = codewords[i] >> 1;  // strip message type bit
+        // Data field: bits 30-11 of the 32-bit codeword (20 bits, MSB-first).
+        // >>1 was wrong — it strips parity (bit 0) and then reads bits 0-19
+        // which are CRC + low data, not the data field.
+        uint32_t cw = (codewords[i] >> 11) & 0xFFFFFu;
         for (int b = 19; b >= 0; --b) {
-            bit_buf |= ((cw >> b) & 1) << nbits++;
-            if (nbits == 7) {
+            // POCSAG packs characters MSB-first: shift left, OR new bit at bit 0.
+            bit_buf = (bit_buf << 1) | ((cw >> b) & 1);
+            if (++nbits == 7) {
                 char c = static_cast<char>(bit_buf & 0x7F);
                 if (c >= 0x20 && c < 0x7F) out += c;
                 bit_buf = 0; nbits = 0;
