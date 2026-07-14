@@ -58,7 +58,9 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps = static_cast<float>(sr.in(au::hertz)/AIS_BAUD);
-    freqdem fdem = freqdem_create(0.25f);  // GMSK mod index ~0.25
+    // AIS GMSK h=0.5 at 9600 baud → max_dev = h * baud / 2 = 2400 Hz; kf = dev/sr.
+    float kf_ais = std::clamp(2400.0f / static_cast<float>(sr.in(au::hertz)), 0.01f, 0.49f);
+    freqdem fdem = freqdem_create(kf_ais);
     symsync_rrrf sync = symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_GMSKRX, static_cast<unsigned>(std::round(sps)), 5, 0.4f, 32);
     symsync_rrrf_set_lf_bw(sync, 0.01f);

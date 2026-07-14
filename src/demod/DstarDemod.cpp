@@ -34,8 +34,9 @@ DemodResult DstarDemod::process(const std::vector<std::complex<float>>& iq,
     if (iq.empty()) return r;
 
     float sps = static_cast<float>(sr.in(au::hertz)/DSTAR_BAUD);
-    // GMSK mod index = 0.5 → mod_index = BT/2 in freqdem terms ≈ 0.25
-    freqdem fdem = freqdem_create(0.25f);
+    // GMSK h=0.5 at 4800 baud → max_dev = h * baud / 2 = 1200 Hz; kf = dev/sr.
+    float kf_dstar = std::clamp(1200.0f / static_cast<float>(sr.in(au::hertz)), 0.01f, 0.49f);
+    freqdem fdem = freqdem_create(kf_dstar);
     symsync_rrrf sync = symsync_rrrf_create_rnyquist(
         LIQUID_FIRFILT_GMSKRX, static_cast<unsigned>(std::round(sps)), 5, 0.3f, 32);
     symsync_rrrf_set_lf_bw(sync, 0.01f);
