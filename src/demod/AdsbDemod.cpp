@@ -101,8 +101,8 @@ DemodResult AdsbDemod::process(const std::vector<std::complex<float>>& iq,
             uint8_t me_type=(frame[4]>>3)&0x1F;
             // Airborne velocity (type 19): check groundspeed
             if(me_type==19){
-                int ew_raw=((frame[6]&0x03)<<8)|frame[7];
-                int ns_raw=((frame[8]&0x7F)<<3)|(frame[9]>>5);
+                int ew_raw=((frame[5]&0x03)<<8)|frame[6];
+                int ns_raw=((frame[7]&0x7F)<<3)|((frame[8]>>5)&0x07);
                 double ew_kt=(ew_raw>0)?(ew_raw-1):0;
                 double ns_kt=(ns_raw>0)?(ns_raw-1):0;
                 double gs=std::hypot(ew_kt,ns_kt);
