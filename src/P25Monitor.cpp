@@ -40,8 +40,16 @@ public:
 
     void on_container_start(proton::container& c) override {
         proton::connection_options copts;
-        if (!mon_.cfg_.broker.username.empty())
+        if (!mon_.cfg_.broker.username.empty()) {
+            // Without PLAIN + insecure-mechs, proton never negotiates credentials
+            // onto the wire — Artemis sees an anonymous connection and rejects it
+            // (AMQ229031). Same fix as SpeechApp::AmqpListener and AlertPublisher.
+            copts.sasl_allowed_mechs("PLAIN");
+            copts.sasl_allow_insecure_mechs(true);
             copts.user(mon_.cfg_.broker.username);
+        } else {
+            copts.sasl_allowed_mechs("ANONYMOUS");
+        }
         if (!mon_.cfg_.broker.password.empty())
             copts.password(mon_.cfg_.broker.password);
         // Without this, a failed initial connection (Artemis not up yet) is

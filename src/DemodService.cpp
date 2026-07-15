@@ -178,9 +178,10 @@ public:
     void close() {
         if (auto* wq = wq_.load())
             wq->add([this]{ sender_.connection().close(); });
-        else if (auto* c = container_.load())
-            // Broker never reached; stop the reactor so subscriptionLoop's
-            // container->run() returns and sub_thread_ can be joined.
+        // Always stop the container: ensures run() exits even if wq_ is stale
+        // (connection dropped, reconnect in progress) and close() above is
+        // silently ignored by the dead work queue.
+        if (auto* c = container_.load())
             c->stop();
     }
 

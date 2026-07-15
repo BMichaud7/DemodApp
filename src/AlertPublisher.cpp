@@ -33,13 +33,10 @@ void AlertPublisher::stop() {
     stopping_ = true;
     if (auto* wq = wq_.load())
         wq->add([this]{ sender_.connection().close(); });
-    else
-        // Connection never reached on_sender_open (e.g. still mid-reconnect
-        // after Artemis wasn't up at start()), so there's no work queue to
-        // post a close through -- stop the reactor directly so thread_.join()
-        // below can't block forever now that reconnect_options below retries
-        // indefinitely. Matches AcquisitionApp::AmqpPublisher / TaskAmqpChannel.
-        container_.stop();
+    // Always stop the container: ensures run() exits even if wq_ is stale
+    // (connection dropped, reconnect in progress) and close() above is
+    // silently ignored by the dead work queue. Same fix as GpsApp::AmqpPublisher.
+    container_.stop();
     if (thread_.joinable()) thread_.join();
     wq_.store(nullptr);  // prevent double-stop from posting to a dead work queue
 }

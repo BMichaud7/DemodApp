@@ -73,11 +73,10 @@ public:
         if (container_) {
             if (auto* wq = wq_.load())
                 wq->add([this]{ sender_.connection().close(); });
-            else
-                // wq_ is null when the broker was never reached (reconnect loop
-                // still running). Without this, thread_.join() blocks forever
-                // under max_attempts(0) — same fix as GpsApp::AmqpPublisher.
-                container_->stop();
+            // Always stop the container: ensures run() exits even if wq_ is
+            // stale (connection dropped, reconnect in progress) and close() above
+            // is silently ignored by the dead work queue.
+            container_->stop();
             if (thread_.joinable()) thread_.join();
             wq_.store(nullptr);
             container_.reset();
