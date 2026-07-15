@@ -90,8 +90,13 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
     // ── AIS spoofing heuristics ───────────────────────────────────────────
     // AIS message type 1/2/3 (position report): minimum 28 bytes
     if (r.bits.size() >= 28) {
-        const auto& b = r.bits;
-        int msg_type = (b[0] >> 2) & 0x3F;
+        // Message type is the first 6 decoded bits, MSB-first — read from
+        // decoded[] directly. Reading from the LSB-first byte-packed r.bits
+        // gives a bit-reversed value that never matches types 1-3.
+        int msg_type = decoded.size() >= 6
+            ? ((decoded[0]&1)<<5)|((decoded[1]&1)<<4)|((decoded[2]&1)<<3)
+              |((decoded[3]&1)<<2)|((decoded[4]&1)<<1)|(decoded[5]&1)
+            : 0;
         if (msg_type >= 1 && msg_type <= 3) {
             // MMSI: bits 8-37 (30 bits)
             uint32_t mmsi = 0;
