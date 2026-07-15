@@ -63,8 +63,8 @@ DemodResult RttyDemod::process(const std::vector<std::complex<float>>& iq,
             uint8_t code=0;
             for(int b=0;b<5;++b) code|=static_cast<uint8_t>(bits[i+1+b]<<b);
             if(bits[i+6]==1){  // stop bit
-                if(code==0x1F) figure_mode=true;
-                else if(code==0x1B) figure_mode=false;
+                if(code==0x1F) figure_mode=false;   // LTRS → letter mode
+                else if(code==0x1B) figure_mode=true; // FIGS → figure mode
                 else {
                     char c=figure_mode?FIGURE[code]:LETTER[code];
                     if(c&&c!='\0') text+=c;
