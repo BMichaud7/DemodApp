@@ -90,21 +90,34 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
     // ── AIS spoofing heuristics ───────────────────────────────────────────
     // AIS message type 1/2/3 (position report): minimum 28 bytes
     if (r.bits.size() >= 28) {
-        // Message type is the first 6 decoded bits, MSB-first — read from
-        // decoded[] directly. Reading from the LSB-first byte-packed r.bits
-        // gives a bit-reversed value that never matches types 1-3.
-        int msg_type = decoded.size() >= 6
-            ? ((decoded[0]&1)<<5)|((decoded[1]&1)<<4)|((decoded[2]&1)<<3)
-              |((decoded[3]&1)<<2)|((decoded[4]&1)<<1)|(decoded[5]&1)
+        // The decoded bit stream begins with preamble bits followed by the
+        // HDLC start flag (01111110 = 8 bits). The AIS payload starts after
+        // the flag. Scan for the flag to find the correct payload offset;
+        // without this, decoded[0:6] are preamble bits and msg_type is always
+        // wrong, so the spoofing check never fires on real position reports.
+        size_t ps = decoded.size(); // payload_start; default: flag not found
+        for (size_t i = 0; i + 8 <= decoded.size(); ++i) {
+            if (decoded[i]==0 && decoded[i+1]==1 && decoded[i+2]==1 &&
+                decoded[i+3]==1 && decoded[i+4]==1 && decoded[i+5]==1 &&
+                decoded[i+6]==1 && decoded[i+7]==0) {
+                ps = i + 8;
+                break;
+            }
+        }
+
+        // Message type is the first 6 payload bits, MSB-first.
+        int msg_type = (ps + 6 <= decoded.size())
+            ? ((decoded[ps+0]&1)<<5)|((decoded[ps+1]&1)<<4)|((decoded[ps+2]&1)<<3)
+              |((decoded[ps+3]&1)<<2)|((decoded[ps+4]&1)<<1)|(decoded[ps+5]&1)
             : 0;
         if (msg_type >= 1 && msg_type <= 3) {
-            // MMSI: bits 8-37 (30 bits)
+            // MMSI: payload bits 8-37 (30 bits)
             uint32_t mmsi = 0;
-            for (int i=8;i<38;++i) mmsi = (mmsi<<1)|((decoded.size()>i)?(decoded[i]&1):0);
-            // SOG (speed over ground): bits 50-59, 1/10 knot units
+            for (int i=8;i<38;++i) mmsi = (mmsi<<1)|((ps+i<decoded.size())?(decoded[ps+i]&1):0);
+            // SOG (speed over ground): payload bits 50-59, 1/10 knot units
             uint32_t sog_raw = 0;
-            for (int i=50;i<60&&i<(int)decoded.size();++i)
-                sog_raw = (sog_raw<<1)|(decoded[i]&1);
+            for (int i=50;i<60&&ps+i<decoded.size();++i)
+                sog_raw = (sog_raw<<1)|(decoded[ps+i]&1);
             double sog_kt = sog_raw / 10.0;
 
             // Vessels >102.2 knots are flagged as "not available" in the spec.
@@ -116,7 +129,7 @@ DemodResult AisDemod::process(const std::vector<std::complex<float>>& iq,
                     " knots (surface vessel max ~50 kt)\"}";
                 spdlog::warn("[ALERT] AIS spoofing: MMSI={} SOG={:.1f} kt", mmsi, sog_kt);
             }
-            // MMSI sanity: must be 9 digits, 100000000–999999999
+            // MMSI sanity: must be 9 digits, 100000000-999999999
             // Only set if no higher-severity alert already fired.
             if (r.alert_json.empty() && (mmsi < 100000000 || mmsi > 999999999)) {
                 r.alert_json = "{\"type\":\"AIS_SPOOFING\",\"severity\":\"MEDIUM\","
