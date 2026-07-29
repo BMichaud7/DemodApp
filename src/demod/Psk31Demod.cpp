@@ -77,14 +77,25 @@ DemodResult Psk31Demod::process(const std::vector<std::complex<float>>& iq,
     }
     modemcf_destroy(mod);
 
-    // Varicode decode: two consecutive 0s = character boundary
+    // Varicode decode: two consecutive 0s = character boundary.
+    // All codes except space (=0b1) end in a trailing 0, so the first gap-zero is
+    // accumulated as part of the code.  Space has no trailing zero, so its first
+    // gap-zero turns 0b1 into 0b10 (=2) which matches nothing.  On decode failure
+    // retry with accum>>1 to strip the spuriously-accumulated zero — safe because
+    // space is the only code whose last bit is 1.
     std::string text;
     uint32_t accum=0; int nbits=0; int zeros=0;
     for(uint8_t b:bits){
         if(b==0){ ++zeros; if(zeros>=2&&nbits>0){
-            // Try to decode Varicode character
+            bool found=false;
             for(int c=32;c<96;++c){
-                if(accum==VARICODE[c]){text+=static_cast<char>(c);break;}
+                if(accum==VARICODE[c]){text+=static_cast<char>(c);found=true;break;}
+            }
+            if(!found&&nbits>1){
+                uint32_t alt=accum>>1;
+                for(int c=32;c<96;++c){
+                    if(alt==VARICODE[c]){text+=static_cast<char>(c);break;}
+                }
             }
             accum=0;nbits=0;zeros=0;
         } else { accum=(accum<<1)|0; ++nbits; }
